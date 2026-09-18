@@ -1,0 +1,5 @@
+API_KEY=dev-local-key
+ENVIRONMENT=development
+SOL_API_URL=http://localhost:8787
+SOL_API_KEY=dev-local-key
+RESEND_API_KEY=re_xxx
