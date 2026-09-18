@@ -119,6 +119,55 @@ describe("prepareEmail", () => {
     const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
     expect(prepared.html).toContain(`${ORIGIN}/banner.png`);
   });
+
+  it("renders no CTA button when ctaUrl isn't provided", async () => {
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
+    expect(prepared.html).not.toContain("<a href");
+  });
+
+  it("renders a CTA button with the default label when ctaUrl is given without ctaLabel", async () => {
+    const prepared = await prepareEmail(
+      SOL_API_ENV,
+      { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "https://us1.admin.mailchimp.com/lists/" } },
+      ORIGIN
+    );
+    expect(prepared.html).toContain('href="https://us1.admin.mailchimp.com/lists/"');
+    expect(prepared.html).toContain("View in Mailchimp");
+  });
+
+  it("renders a CTA button with a custom label when both ctaUrl and ctaLabel are given", async () => {
+    const prepared = await prepareEmail(
+      SOL_API_ENV,
+      {
+        ...baseEnvelope,
+        fields: {
+          ...baseEnvelope.fields,
+          ctaUrl: "https://us1.admin.mailchimp.com/lists/",
+          ctaLabel: "View your audience",
+        },
+      },
+      ORIGIN
+    );
+    expect(prepared.html).toContain("View your audience");
+    expect(prepared.html).not.toContain("View in Mailchimp");
+  });
+
+  it("does not render ctaUrl/ctaLabel as a visible field row", async () => {
+    const prepared = await prepareEmail(
+      SOL_API_ENV,
+      { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "https://us1.admin.mailchimp.com/lists/" } },
+      ORIGIN
+    );
+    // FieldGroup renders each field's key as an uppercase label — "ctaUrl"
+    // itself should never appear as label text, only inside the href.
+    expect(prepared.html).not.toMatch(/>ctaUrl</i);
+  });
+
+  it("throws InvalidTemplateFieldsError when ctaUrl isn't a valid URL", async () => {
+    await expect(
+      prepareEmail(SOL_API_ENV, { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "not-a-url" } }, ORIGIN)
+    ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
+  });
 });
 
 describe("deliverEmail", () => {
