@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { logger } from "./logger.js";
+import { setLastEmailPreview } from "./email-preview-store.js";
 
 export interface SendEmailRequest {
   to: string[];
@@ -25,8 +26,12 @@ export async function sendEmail(
   request: SendEmailRequest
 ): Promise<SendEmailResult> {
   if (env.ENVIRONMENT === "development") {
-    logger.info("mock email send", { to: request.to, subject: request.subject });
-    console.log(request.html);
+    setLastEmailPreview(request.html);
+    logger.info("mock email send", {
+      to: request.to,
+      subject: request.subject,
+      preview: "http://localhost:8788/__preview/last-email",
+    });
     return { mode: "mock", resendId: null };
   }
 

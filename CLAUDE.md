@@ -24,6 +24,10 @@ SOL_API_KEY=dev-local-key
 RESEND_API_KEY=re_xxx
 ```
 
+### Viewing a rendered email locally
+
+In `development`, email sending is mocked — no real send happens. Instead of dumping raw HTML to the terminal, the most recently rendered email is held in memory and served as a real page: after POSTing a `notification.requested` payload, open **http://localhost:8788/__preview/last-email** in a browser to see it rendered. This route is self-gated to `ENVIRONMENT === "development"` (404s in staging/production, unauthenticated by design since it's meant to be opened directly in a browser) — rendered email content can carry PII, so it must never be reachable anywhere else.
+
 ## Architecture
 
 **Stack**: Hono 4.x → Cloudflare Workers (V8 isolate), no database. Client config and the audit-log trail both live behind `sol-api` (`../sol-api`), reached over HTTP with `X-API-Key` auth via `SOL_API_URL`/`SOL_API_KEY`.
