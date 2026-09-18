@@ -43,7 +43,7 @@ src/
 ├── emails/
 │   ├── styles.ts                    # design tokens, ported from the old service
 │   ├── components/                  # shared primitives (EmailContainer, EmailHeader, EmailFooter, Banner, SectionDivider, FieldGroup, LabelText), ported from sales-lead-v1.tsx
-│   ├── templates/integration-confirmation.tsx   # first template
+│   ├── templates/mailchimp-confirmation.tsx   # first template
 │   └── registry.ts                  # emailTemplate -> { fieldsSchema, component } — add a template here, nothing else changes
 ├── lib/
 │   ├── sol-api.ts                   # typed HTTP client: getClient(), writeNotificationLog()

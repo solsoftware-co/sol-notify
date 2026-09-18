@@ -11,23 +11,29 @@ import { colors } from "../styles.js";
 // submitted" template) — same shared components, same design tokens. Much
 // thinner than the original: a confirmation email doesn't need comments,
 // a CTA button, or the metadata block, just "here's what was synced."
-export interface IntegrationConfirmationEmailProps {
+//
+// Named for Mailchimp specifically rather than generically ("integration
+// confirmation") because it only ever serves Mailchimp — a future
+// integration type (e.g. Google Sheets, SOL-10) gets its own sibling
+// template (google_sheets_confirmation) rather than reusing this one, so a
+// generic name would have implied a generality this template doesn't have.
+export interface MailchimpConfirmationEmailProps {
   previewText: string;
   clientName: string;
   header: string;
-  /** Arbitrary key-value pairs describing what was synced — shape varies by
-   * integration type (Mailchimp's {email, merge_fields...} today, Google
-   * Sheets' column values later via a sibling template). Rendered generically
-   * via FieldGroup, so new shapes need no new rendering code. */
+  /** Arbitrary key-value pairs describing what was synced to Mailchimp.
+   * Rendered generically via FieldGroup — a future sibling template with a
+   * different field shape needs no new rendering code, just its own schema
+   * and this same component pattern. */
   fields: Record<string, string>;
 }
 
-export default function IntegrationConfirmationEmail({
+export default function MailchimpConfirmationEmail({
   previewText,
   clientName,
   header,
   fields,
-}: IntegrationConfirmationEmailProps) {
+}: MailchimpConfirmationEmailProps) {
   const fieldList = Object.entries(fields).map(([label, value]) => ({ label, value }));
 
   return (

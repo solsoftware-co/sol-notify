@@ -31,7 +31,7 @@ const baseEnvelope = {
   type: "email" as const,
   recipients: ["sales@acme.com"],
   subject: "New lead added to Mailchimp",
-  emailTemplate: "integration_confirmation",
+  emailTemplate: "mailchimp_confirmation",
   fields: { email: "jane@example.com" },
 };
 
@@ -55,7 +55,7 @@ describe("prepareEmail", () => {
     const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
     expect(getClientMock).toHaveBeenCalledWith(SOL_API_ENV.SOL_API_URL, SOL_API_ENV.SOL_API_KEY, "acme-corp");
     expect(prepared.clientId).toBe("acme-corp");
-    expect(prepared.emailTemplate).toBe("integration_confirmation");
+    expect(prepared.emailTemplate).toBe("mailchimp_confirmation");
     expect(prepared.recipients).toEqual(["sales@acme.com"]);
     expect(prepared.html).toContain("Acme Corp");
     expect(prepared.html.toLowerCase()).toContain("jane@example.com");
@@ -82,7 +82,7 @@ describe("prepareEmail", () => {
 describe("deliverEmail", () => {
   const prepared = {
     clientId: "acme-corp",
-    emailTemplate: "integration_confirmation",
+    emailTemplate: "mailchimp_confirmation",
     recipients: ["sales@acme.com"],
     subject: "New lead added to Mailchimp",
     html: "<html></html>",

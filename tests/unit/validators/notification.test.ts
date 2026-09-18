@@ -7,7 +7,7 @@ describe("notificationRequestSchema", () => {
     type: "email",
     recipients: ["sales@acme.com"],
     subject: "New lead added to Mailchimp",
-    emailTemplate: "integration_confirmation",
+    emailTemplate: "mailchimp_confirmation",
     fields: { email: "jane@example.com" },
   };
 
