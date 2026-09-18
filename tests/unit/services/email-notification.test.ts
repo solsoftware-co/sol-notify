@@ -50,9 +50,11 @@ beforeEach(() => {
   });
 });
 
+const ORIGIN = "http://localhost:8788";
+
 describe("prepareEmail", () => {
   it("fetches the client and renders HTML for a valid envelope", async () => {
-    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
     expect(getClientMock).toHaveBeenCalledWith(SOL_API_ENV.SOL_API_URL, SOL_API_ENV.SOL_API_KEY, "acme-corp");
     expect(prepared.clientId).toBe("acme-corp");
     expect(prepared.emailTemplate).toBe("mailchimp_confirmation");
@@ -63,19 +65,59 @@ describe("prepareEmail", () => {
 
   it("throws UnknownEmailTemplateError for an emailTemplate not in the registry", async () => {
     await expect(
-      prepareEmail(SOL_API_ENV, { ...baseEnvelope, emailTemplate: "does_not_exist" })
+      prepareEmail(SOL_API_ENV, { ...baseEnvelope, emailTemplate: "does_not_exist" }, ORIGIN)
     ).rejects.toBeInstanceOf(UnknownEmailTemplateError);
   });
 
   it("throws InvalidTemplateFieldsError when fields don't match the template's schema", async () => {
     await expect(
-      prepareEmail(SOL_API_ENV, { ...baseEnvelope, fields: { count: 5 } as unknown as Record<string, string> })
+      prepareEmail(
+        SOL_API_ENV,
+        { ...baseEnvelope, fields: { count: 5 } as unknown as Record<string, string> },
+        ORIGIN
+      )
     ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
   });
 
   it("propagates SolApiNotFoundError when the client doesn't exist", async () => {
     getClientMock.mockRejectedValue(new SolApiNotFoundError("Client not found: acme-corp"));
-    await expect(prepareEmail(SOL_API_ENV, baseEnvelope)).rejects.toBeInstanceOf(SolApiNotFoundError);
+    await expect(prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN)).rejects.toBeInstanceOf(SolApiNotFoundError);
+  });
+
+  it("falls back to the default banner (relative to the request origin) when the client has no banner settings", async () => {
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
+    expect(prepared.html).toContain(`${ORIGIN}/banner.png`);
+  });
+
+  it("uses the client's own banner when settings.banner.imageUrl is set", async () => {
+    getClientMock.mockResolvedValue({
+      id: "acme-corp",
+      name: "Acme Corp",
+      email: "contact@acme.com",
+      active: true,
+      settings: { banner: { imageUrl: "https://acme.example.com/logo.png", height: 60 } },
+      timezone: "America/Chicago",
+      createdAt: "2026-01-01T00:00:00Z",
+    });
+
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
+    expect(prepared.html).toContain("https://acme.example.com/logo.png");
+    expect(prepared.html).not.toContain(`${ORIGIN}/banner.png`);
+  });
+
+  it("drops an invalid banner imageUrl and falls back to the default rather than failing the email", async () => {
+    getClientMock.mockResolvedValue({
+      id: "acme-corp",
+      name: "Acme Corp",
+      email: "contact@acme.com",
+      active: true,
+      settings: { banner: { imageUrl: "not-a-valid-url" } },
+      timezone: "America/Chicago",
+      createdAt: "2026-01-01T00:00:00Z",
+    });
+
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
+    expect(prepared.html).toContain(`${ORIGIN}/banner.png`);
   });
 });
 

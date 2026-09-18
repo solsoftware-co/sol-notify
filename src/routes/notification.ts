@@ -29,7 +29,7 @@ notification.post("/", async (c) => {
 
   let prepared;
   try {
-    prepared = await prepareEmail(solApiEnv, envelope);
+    prepared = await prepareEmail(solApiEnv, envelope, new URL(c.req.url).origin);
   } catch (err) {
     if (err instanceof SolApiNotFoundError) {
       return notFoundResponse(c, err.message);

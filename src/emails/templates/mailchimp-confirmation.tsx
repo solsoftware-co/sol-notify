@@ -26,6 +26,12 @@ export interface MailchimpConfirmationEmailProps {
    * different field shape needs no new rendering code, just its own schema
    * and this same component pattern. */
   fields: Record<string, string>;
+  /** Always set by the caller — either the client's own banner (from
+   * clients.settings.banner) or the default Sol Software one. There is no
+   * "no banner" case. */
+  bannerUrl: string;
+  bannerHeight?: number;
+  bannerWidth?: number;
 }
 
 export default function MailchimpConfirmationEmail({
@@ -33,6 +39,9 @@ export default function MailchimpConfirmationEmail({
   clientName,
   header,
   fields,
+  bannerUrl,
+  bannerHeight,
+  bannerWidth,
 }: MailchimpConfirmationEmailProps) {
   const fieldList = Object.entries(fields).map(([label, value]) => ({ label, value }));
 
@@ -42,7 +51,7 @@ export default function MailchimpConfirmationEmail({
         <Preview>{previewText}</Preview>
       </Head>
       <Body style={{ backgroundColor: colors.bg, margin: 0, padding: 0 }}>
-        <Banner />
+        <Banner src={bannerUrl} height={bannerHeight} width={bannerWidth} />
         <EmailContainer>
           <EmailHeader subheader={clientName} header={header} />
           {fieldList.length > 0 && <SectionDivider />}

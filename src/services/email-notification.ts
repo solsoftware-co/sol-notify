@@ -5,6 +5,7 @@ import { getClient, writeNotificationLog } from "../lib/sol-api.js";
 import { sendEmail } from "../lib/email-sender.js";
 import { withRetry } from "../lib/retry.js";
 import { logger } from "../lib/logger.js";
+import { parseBannerConfig } from "../lib/banner-config.js";
 
 export class UnknownEmailTemplateError extends Error {
   constructor(message: string) {
@@ -38,7 +39,14 @@ export interface PreparedEmail {
 // immediately, not deferred to the background.
 export async function prepareEmail(
   env: { SOL_API_URL: string; SOL_API_KEY: string },
-  envelope: EmailEnvelope
+  envelope: EmailEnvelope,
+  // Origin of the incoming request (e.g. http://localhost:8788, or
+  // https://sol-notify-pr-42.solsoftware.workers.dev) — used to build an
+  // absolute URL for the default banner asset served from public/banner.png.
+  // Deriving it from the request rather than a hardcoded/configured value
+  // means it's automatically correct in dev, staging, production, and every
+  // ephemeral PR preview alike.
+  origin: string
 ): Promise<PreparedEmail> {
   const template = emailTemplates[envelope.emailTemplate as keyof typeof emailTemplates];
   if (!template) {
@@ -55,6 +63,12 @@ export async function prepareEmail(
 
   const client = await getClient(env.SOL_API_URL, env.SOL_API_KEY, envelope.clientId);
 
+  // A client's own banner overrides the default Sol Software one; a client
+  // with no (or invalid) banner settings still gets a banner, just the
+  // default — matching the old service's behavior, where a banner was never
+  // simply absent.
+  const banner = parseBannerConfig(client.settings);
+
   const Component = template.component;
   const html = await render(
     Component({
@@ -62,6 +76,9 @@ export async function prepareEmail(
       clientName: client.name,
       header: envelope.subject,
       fields: parsedFields.data as Record<string, string>,
+      bannerUrl: banner.imageUrl ?? `${origin}/banner.png`,
+      bannerHeight: banner.height,
+      bannerWidth: banner.width,
     })
   );
 
