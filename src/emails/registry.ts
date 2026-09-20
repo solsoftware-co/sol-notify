@@ -39,15 +39,23 @@ interface EmailTemplateDefinition {
 // still call it with that template's real props).
 //
 // mailchimp_confirmation's fields are mostly a generic display bag (whatever
-// was synced — email, merge_fields flattened, etc.), but ctaUrl/ctaLabel are
-// reserved keys consumed by the CTA button rather than rendered as a visible
-// field row. .catchall() types every other key as a display-field string
-// while still validating the two reserved keys with their own rules.
+// was synced — email, merge_fields flattened, etc.), but `cta` is a reserved
+// key consumed by the CTA button rather than rendered as a visible field
+// row. Nested under one key (not flat ctaUrl/ctaLabel siblings) for two
+// reasons: it can't collide with a caller's own display-field name the way
+// two flat reserved keys could, and it lets `url` be required once `cta` is
+// present at all — a label with no URL is meaningless, which a flat
+// optional/optional pair couldn't express without a custom .refine().
+// .catchall() types every other top-level key as a display-field string.
 export const emailTemplates = {
   mailchimp_confirmation: {
     fieldsSchema: z.object({
-        ctaUrl: z.string().url().optional(),
-        ctaLabel: z.string().min(1).optional(),
+        cta: z
+          .object({
+            url: z.string().url(),
+            label: z.string().min(1).optional(),
+          })
+          .optional(),
       }).catchall(z.string()),
     component: MailchimpConfirmationEmail,
   },
