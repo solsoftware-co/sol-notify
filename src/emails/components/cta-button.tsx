@@ -2,9 +2,10 @@ import { Section } from "@react-email/components";
 import { colors, typography, radii, spacing } from "../styles.js";
 
 // Ported as-is from the old service's cta-button.tsx (same bulletproof
-// table-based button markup for Outlook compatibility). Only the primary
-// variant/md size/default radius are used today, but the full prop surface
-// is kept so a future template can reuse it without re-adding options.
+// table-based button markup for Outlook compatibility). Defaults to
+// black/rounded — the house style, and what every real usage so far
+// actually wants — rather than the more "generic" primary/default; callers
+// only override when they deliberately want something else.
 export interface CTAButtonProps {
   href: string;
   label: string;
@@ -30,7 +31,7 @@ const radiusStyles: Record<NonNullable<CTAButtonProps["radius"]>, string> = {
   rounded: "9999px",
 };
 
-export function CTAButton({ href, label, variant = "primary", size = "md", radius = "default" }: CTAButtonProps) {
+export function CTAButton({ href, label, variant = "black", size = "md", radius = "rounded" }: CTAButtonProps) {
   const { bg, textColor, border } = variantStyles[variant];
   const padding = sizeStyles[size];
   const borderRadius = radiusStyles[radius];
