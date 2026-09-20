@@ -10,7 +10,7 @@ export const emailEnvelopeSchema = z.object({
   type: z.literal("email"),
   recipients: z.array(z.string().min(1)).min(1),
   subject: z.string().min(1),
-  emailTemplate: z.enum(emailTemplateNames as [string, ...string[]]),
+  emailTemplate: z.enum(emailTemplateNames),
   fields: z.record(z.string(), z.unknown()),
 });
 

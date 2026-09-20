@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { EmailEnvelope } from "../../../src/validators/notification.js";
 
 const getClientMock = vi.fn();
 const writeNotificationLogMock = vi.fn();
@@ -31,7 +32,7 @@ const baseEnvelope = {
   type: "email" as const,
   recipients: ["sales@acme.com"],
   subject: "New lead added to Mailchimp",
-  emailTemplate: "mailchimp_confirmation",
+  emailTemplate: "mailchimp_confirmation" as const,
   fields: { email: "jane@example.com" },
 };
 
@@ -64,8 +65,16 @@ describe("prepareEmail", () => {
   });
 
   it("throws UnknownEmailTemplateError for an emailTemplate not in the registry", async () => {
+    // Deliberately invalid — emailTemplate is typed to the registry's known
+    // names, so this cast is intentional: it exercises prepareEmail's own
+    // defense-in-depth check, which matters if it's ever called with an
+    // envelope that didn't go through the Zod schema first.
     await expect(
-      prepareEmail(SOL_API_ENV, { ...baseEnvelope, emailTemplate: "does_not_exist" }, ORIGIN)
+      prepareEmail(
+        SOL_API_ENV,
+        { ...baseEnvelope, emailTemplate: "does_not_exist" as unknown as EmailEnvelope["emailTemplate"] },
+        ORIGIN
+      )
     ).rejects.toBeInstanceOf(UnknownEmailTemplateError);
   });
 
