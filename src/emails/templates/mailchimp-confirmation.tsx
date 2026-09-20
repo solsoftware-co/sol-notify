@@ -66,7 +66,15 @@ export default function MailchimpConfirmationEmail({
           <EmailHeader subheader={clientName} header={header} />
           {fieldList.length > 0 && <SectionDivider />}
           {fieldList.length > 0 && <FieldGroup fields={fieldList} />}
-          {ctaUrl && <CTAButton href={ctaUrl} label={ctaLabel ?? "View in Mailchimp"} />}
+          {ctaUrl && (
+            <CTAButton
+              href={ctaUrl}
+              label={ctaLabel ?? "View in Mailchimp"}
+              variant="black"
+              size="lg"
+              radius="rounded"
+            />
+          )}
           <EmailFooter />
         </EmailContainer>
       </Body>
