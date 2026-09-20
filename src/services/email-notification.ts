@@ -62,24 +62,15 @@ export async function prepareEmail(
   // simply absent.
   const banner = parseBannerConfig(client.settings);
 
-  // `cta` is a reserved key the caller may include in `fields` to get a CTA
-  // button rendered (e.g. linking to the client's Mailchimp audience) —
-  // it's consumed here, not passed through to FieldGroup as a visible field
-  // row. Nested (not flat ctaUrl/ctaLabel keys) so it can't collide with a
-  // caller's own display-field name — see registry.ts's fieldsSchema.
-  const { cta, ...displayFields } = parsedFields.data as {
-    cta?: { url: string; label?: string };
-  } & Record<string, string>;
-
   const Component = template.component;
   const html = await render(
     Component({
       previewText: envelope.subject,
       clientName: client.name,
       header: envelope.subject,
-      fields: displayFields,
-      ctaUrl: cta?.url,
-      ctaLabel: cta?.label,
+      fields: parsedFields.data as Record<string, string>,
+      ctaUrl: envelope.cta?.url,
+      ctaLabel: envelope.cta?.label,
       bannerUrl: banner.imageUrl ?? DEFAULT_BANNER_URL,
       bannerHeight: banner.height,
       bannerWidth: banner.width,

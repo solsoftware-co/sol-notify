@@ -52,4 +52,40 @@ describe("notificationRequestSchema", () => {
     const result = notificationRequestSchema.safeParse({ ...valid, fields: {} });
     expect(result.success).toBe(true);
   });
+
+  it("accepts an envelope with no cta at all", () => {
+    const result = notificationRequestSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a cta with just a url", () => {
+    const result = notificationRequestSchema.safeParse({
+      ...valid,
+      cta: { url: "https://us1.admin.mailchimp.com/lists/" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a cta with both url and label", () => {
+    const result = notificationRequestSchema.safeParse({
+      ...valid,
+      cta: { url: "https://us1.admin.mailchimp.com/lists/", label: "View your audience" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a cta.url that isn't a valid URL", () => {
+    const result = notificationRequestSchema.safeParse({ ...valid, cta: { url: "not-a-url" } });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a cta.label given without cta.url — a label with no URL is meaningless", () => {
+    const result = notificationRequestSchema.safeParse({ ...valid, cta: { label: "View your audience" } });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects cta given as a non-object", () => {
+    const result = notificationRequestSchema.safeParse({ ...valid, cta: "not-an-object" });
+    expect(result.success).toBe(false);
+  });
 });

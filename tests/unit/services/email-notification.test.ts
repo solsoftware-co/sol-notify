@@ -134,7 +134,7 @@ describe("prepareEmail", () => {
   it("renders a CTA button with the default label when cta.url is given without cta.label", async () => {
     const prepared = await prepareEmail(SOL_API_ENV, {
       ...baseEnvelope,
-      fields: { ...baseEnvelope.fields, cta: { url: "https://us1.admin.mailchimp.com/lists/" } },
+      cta: { url: "https://us1.admin.mailchimp.com/lists/" },
     });
     expect(prepared.html).toContain('href="https://us1.admin.mailchimp.com/lists/"');
     expect(prepared.html).toContain("View in Mailchimp");
@@ -143,10 +143,7 @@ describe("prepareEmail", () => {
   it("renders a CTA button with a custom label when both cta.url and cta.label are given", async () => {
     const prepared = await prepareEmail(SOL_API_ENV, {
       ...baseEnvelope,
-      fields: {
-        ...baseEnvelope.fields,
-        cta: { url: "https://us1.admin.mailchimp.com/lists/", label: "View your audience" },
-      },
+      cta: { url: "https://us1.admin.mailchimp.com/lists/", label: "View your audience" },
     });
     expect(prepared.html).toContain("View your audience");
     expect(prepared.html).not.toContain("View in Mailchimp");
@@ -155,43 +152,11 @@ describe("prepareEmail", () => {
   it("does not render cta as a visible field row", async () => {
     const prepared = await prepareEmail(SOL_API_ENV, {
       ...baseEnvelope,
-      fields: { ...baseEnvelope.fields, cta: { url: "https://us1.admin.mailchimp.com/lists/" } },
+      cta: { url: "https://us1.admin.mailchimp.com/lists/" },
     });
     // FieldGroup renders each field's key as an uppercase label — "cta"
     // itself should never appear as label text, only inside the href.
     expect(prepared.html).not.toMatch(/>cta</i);
-  });
-
-  it("throws InvalidTemplateFieldsError when cta.url isn't a valid URL", async () => {
-    await expect(
-      prepareEmail(SOL_API_ENV, {
-        ...baseEnvelope,
-        fields: { ...baseEnvelope.fields, cta: { url: "not-a-url" } },
-      })
-    ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
-  });
-
-  it("throws InvalidTemplateFieldsError when cta.label is given without cta.url — a label with no URL is meaningless", async () => {
-    await expect(
-      prepareEmail(SOL_API_ENV, {
-        ...baseEnvelope,
-        fields: { ...baseEnvelope.fields, cta: { label: "View your audience" } as unknown as { url: string } },
-      })
-    ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
-  });
-
-  it("a caller's own display field literally named 'cta' as a plain string does not collide with the reserved key", async () => {
-    // If cta were a flat sibling key like the old ctaUrl/ctaLabel design,
-    // a display field named identically would be ambiguous. Nested under
-    // one object, this is unambiguous: a string here fails the object
-    // schema and is rejected, rather than silently misinterpreted as CTA
-    // config or silently dropped.
-    await expect(
-      prepareEmail(SOL_API_ENV, {
-        ...baseEnvelope,
-        fields: { ...baseEnvelope.fields, cta: "not-an-object" as unknown as { url: string } },
-      })
-    ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
   });
 });
 

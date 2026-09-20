@@ -38,25 +38,14 @@ interface EmailTemplateDefinition {
 // entry keeps its own precise component type (so email-notification.ts can
 // still call it with that template's real props).
 //
-// mailchimp_confirmation's fields are mostly a generic display bag (whatever
-// was synced — email, merge_fields flattened, etc.), but `cta` is a reserved
-// key consumed by the CTA button rather than rendered as a visible field
-// row. Nested under one key (not flat ctaUrl/ctaLabel siblings) for two
-// reasons: it can't collide with a caller's own display-field name the way
-// two flat reserved keys could, and it lets `url` be required once `cta` is
-// present at all — a label with no URL is meaningless, which a flat
-// optional/optional pair couldn't express without a custom .refine().
-// .catchall() types every other top-level key as a display-field string.
+// mailchimp_confirmation's fields are a generic display bag (whatever was
+// synced — email, merge_fields flattened, etc.), rendered as label/value rows
+// by FieldGroup. `cta` is not part of this — it's a universal envelope-level
+// concern (see validators/notification.ts), the same way `banner` is derived
+// once from client settings rather than being a per-template field.
 export const emailTemplates = {
   mailchimp_confirmation: {
-    fieldsSchema: z.object({
-        cta: z
-          .object({
-            url: z.string().url(),
-            label: z.string().min(1).optional(),
-          })
-          .optional(),
-      }).catchall(z.string()),
+    fieldsSchema: z.record(z.string(), z.string()),
     component: MailchimpConfirmationEmail,
   },
 } satisfies Record<EmailTemplateName, EmailTemplateDefinition>;
