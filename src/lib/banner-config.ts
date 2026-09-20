@@ -1,3 +1,9 @@
+// Permanently hosted — not tied to any particular deployment/environment,
+// unlike the local-static-asset approach this replaced. A client's own
+// banner (from clients.settings.banner) overrides this; a client with no
+// (or invalid) banner settings gets this instead, never no banner at all.
+export const DEFAULT_BANNER_URL = "https://www.solsoftware.co/image/logo.png";
+
 export interface BannerConfig {
   imageUrl?: string;
   height?: number;

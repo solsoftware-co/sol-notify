@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { EmailEnvelope } from "../../../src/validators/notification.js";
+import { DEFAULT_BANNER_URL } from "../../../src/lib/banner-config.js";
 
 const getClientMock = vi.fn();
 const writeNotificationLogMock = vi.fn();
@@ -51,11 +52,9 @@ beforeEach(() => {
   });
 });
 
-const ORIGIN = "http://localhost:8788";
-
 describe("prepareEmail", () => {
   it("fetches the client and renders HTML for a valid envelope", async () => {
-    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
     expect(getClientMock).toHaveBeenCalledWith(SOL_API_ENV.SOL_API_URL, SOL_API_ENV.SOL_API_KEY, "acme-corp");
     expect(prepared.clientId).toBe("acme-corp");
     expect(prepared.emailTemplate).toBe("mailchimp_confirmation");
@@ -72,8 +71,7 @@ describe("prepareEmail", () => {
     await expect(
       prepareEmail(
         SOL_API_ENV,
-        { ...baseEnvelope, emailTemplate: "does_not_exist" as unknown as EmailEnvelope["emailTemplate"] },
-        ORIGIN
+        { ...baseEnvelope, emailTemplate: "does_not_exist" as unknown as EmailEnvelope["emailTemplate"] }
       )
     ).rejects.toBeInstanceOf(UnknownEmailTemplateError);
   });
@@ -82,20 +80,19 @@ describe("prepareEmail", () => {
     await expect(
       prepareEmail(
         SOL_API_ENV,
-        { ...baseEnvelope, fields: { count: 5 } as unknown as Record<string, string> },
-        ORIGIN
+        { ...baseEnvelope, fields: { count: 5 } as unknown as Record<string, string> }
       )
     ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
   });
 
   it("propagates SolApiNotFoundError when the client doesn't exist", async () => {
     getClientMock.mockRejectedValue(new SolApiNotFoundError("Client not found: acme-corp"));
-    await expect(prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN)).rejects.toBeInstanceOf(SolApiNotFoundError);
+    await expect(prepareEmail(SOL_API_ENV, baseEnvelope)).rejects.toBeInstanceOf(SolApiNotFoundError);
   });
 
-  it("falls back to the default banner (relative to the request origin) when the client has no banner settings", async () => {
-    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
-    expect(prepared.html).toContain(`${ORIGIN}/banner.png`);
+  it("falls back to the permanently-hosted default banner when the client has no banner settings", async () => {
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
+    expect(prepared.html).toContain(DEFAULT_BANNER_URL);
   });
 
   it("uses the client's own banner when settings.banner.imageUrl is set", async () => {
@@ -109,9 +106,9 @@ describe("prepareEmail", () => {
       createdAt: "2026-01-01T00:00:00Z",
     });
 
-    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
     expect(prepared.html).toContain("https://acme.example.com/logo.png");
-    expect(prepared.html).not.toContain(`${ORIGIN}/banner.png`);
+    expect(prepared.html).not.toContain(DEFAULT_BANNER_URL);
   });
 
   it("drops an invalid banner imageUrl and falls back to the default rather than failing the email", async () => {
@@ -125,20 +122,19 @@ describe("prepareEmail", () => {
       createdAt: "2026-01-01T00:00:00Z",
     });
 
-    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
-    expect(prepared.html).toContain(`${ORIGIN}/banner.png`);
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
+    expect(prepared.html).toContain(DEFAULT_BANNER_URL);
   });
 
   it("renders no CTA button when ctaUrl isn't provided", async () => {
-    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope, ORIGIN);
+    const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
     expect(prepared.html).not.toContain("<a href");
   });
 
   it("renders a CTA button with the default label when ctaUrl is given without ctaLabel", async () => {
     const prepared = await prepareEmail(
       SOL_API_ENV,
-      { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "https://us1.admin.mailchimp.com/lists/" } },
-      ORIGIN
+      { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "https://us1.admin.mailchimp.com/lists/" } }
     );
     expect(prepared.html).toContain('href="https://us1.admin.mailchimp.com/lists/"');
     expect(prepared.html).toContain("View in Mailchimp");
@@ -154,8 +150,7 @@ describe("prepareEmail", () => {
           ctaUrl: "https://us1.admin.mailchimp.com/lists/",
           ctaLabel: "View your audience",
         },
-      },
-      ORIGIN
+      }
     );
     expect(prepared.html).toContain("View your audience");
     expect(prepared.html).not.toContain("View in Mailchimp");
@@ -164,8 +159,7 @@ describe("prepareEmail", () => {
   it("does not render ctaUrl/ctaLabel as a visible field row", async () => {
     const prepared = await prepareEmail(
       SOL_API_ENV,
-      { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "https://us1.admin.mailchimp.com/lists/" } },
-      ORIGIN
+      { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "https://us1.admin.mailchimp.com/lists/" } }
     );
     // FieldGroup renders each field's key as an uppercase label — "ctaUrl"
     // itself should never appear as label text, only inside the href.
@@ -174,7 +168,7 @@ describe("prepareEmail", () => {
 
   it("throws InvalidTemplateFieldsError when ctaUrl isn't a valid URL", async () => {
     await expect(
-      prepareEmail(SOL_API_ENV, { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "not-a-url" } }, ORIGIN)
+      prepareEmail(SOL_API_ENV, { ...baseEnvelope, fields: { ...baseEnvelope.fields, ctaUrl: "not-a-url" } })
     ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
   });
 });

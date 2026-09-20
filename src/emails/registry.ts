@@ -45,12 +45,10 @@ interface EmailTemplateDefinition {
 // while still validating the two reserved keys with their own rules.
 export const emailTemplates = {
   mailchimp_confirmation: {
-    fieldsSchema: z
-      .object({
+    fieldsSchema: z.object({
         ctaUrl: z.string().url().optional(),
         ctaLabel: z.string().min(1).optional(),
-      })
-      .catchall(z.string()),
+      }).catchall(z.string()),
     component: MailchimpConfirmationEmail,
   },
 } satisfies Record<EmailTemplateName, EmailTemplateDefinition>;

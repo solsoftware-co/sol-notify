@@ -5,7 +5,7 @@ import { getClient, writeNotificationLog } from "../lib/sol-api.js";
 import { sendEmail } from "../lib/email-sender.js";
 import { withRetry } from "../lib/retry.js";
 import { logger } from "../lib/logger.js";
-import { parseBannerConfig } from "../lib/banner-config.js";
+import { parseBannerConfig, DEFAULT_BANNER_URL } from "../lib/banner-config.js";
 
 export class UnknownEmailTemplateError extends Error {
   constructor(message: string) {
@@ -39,14 +39,7 @@ export interface PreparedEmail {
 // immediately, not deferred to the background.
 export async function prepareEmail(
   env: { SOL_API_URL: string; SOL_API_KEY: string },
-  envelope: EmailEnvelope,
-  // Origin of the incoming request (e.g. http://localhost:8788, or
-  // https://sol-notify-pr-42.solsoftware.workers.dev) — used to build an
-  // absolute URL for the default banner asset served from public/banner.png.
-  // Deriving it from the request rather than a hardcoded/configured value
-  // means it's automatically correct in dev, staging, production, and every
-  // ephemeral PR preview alike.
-  origin: string
+  envelope: EmailEnvelope
 ): Promise<PreparedEmail> {
   const template = emailTemplates[envelope.emailTemplate as keyof typeof emailTemplates];
   if (!template) {
@@ -69,7 +62,7 @@ export async function prepareEmail(
   // simply absent.
   const banner = parseBannerConfig(client.settings);
 
-  // ctaUrl/ctaLabel are reserved keys the caller may include in `fields` to
+  //   are reserved keys the caller may include in `fields` to
   // get a CTA button rendered (e.g. linking to the client's Mailchimp
   // audience) — they're consumed here, not passed through to FieldGroup as
   // a visible field row.
@@ -84,7 +77,7 @@ export async function prepareEmail(
       fields: displayFields as Record<string, string>,
       ctaUrl,
       ctaLabel,
-      bannerUrl: banner.imageUrl ?? `${origin}/banner.png`,
+      bannerUrl: banner.imageUrl ?? DEFAULT_BANNER_URL,
       bannerHeight: banner.height,
       bannerWidth: banner.width,
     })

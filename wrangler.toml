@@ -3,15 +3,6 @@ main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-# Serves the default Sol Software banner (public/banner.png) at a stable,
-# absolute-URL-able path — email clients need a real fetchable URL, not a
-# bundled asset, and this works identically in dev/staging/production/PR
-# previews without any separate hosting to set up. Static-asset requests are
-# served before the Worker's own fetch handler runs, so this needs no route
-# registered in src/index.ts.
-[assets]
-directory = "./public"
-
 [dev]
 ip = "0.0.0.0"
 port = 8788
