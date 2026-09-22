@@ -41,7 +41,7 @@ export async function prepareEmail(
   env: { SOL_API_URL: string; SOL_API_KEY: string },
   envelope: EmailEnvelope
 ): Promise<PreparedEmail> {
-  const template = emailTemplates[envelope.emailTemplate as keyof typeof emailTemplates];
+  const template = emailTemplates[envelope.emailTemplate];
   if (!template) {
     throw new UnknownEmailTemplateError(`Unknown emailTemplate: ${envelope.emailTemplate}`);
   }
