@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/solsoftware-co/sol-notify/compare/v1.0.0...v1.1.0) (2026-09-23)
+
+
+### Features
+
+* add persistent production environment (SOL-29) ([d7204e9](https://github.com/solsoftware-co/sol-notify/commit/d7204e953ddb9313ba5729473a5315c6a2459b43))
+
 # 1.0.0 (2026-09-23)
 
 
