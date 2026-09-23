@@ -15,6 +15,14 @@ npm run type-check # tsc --noEmit
 npm run deploy     # deploy to Cloudflare Workers
 ```
 
+## Environments
+
+- **`development`** (local `npm run dev`) — email sends are mocked, see below.
+- **`staging`** (`env.staging` in `wrangler.toml`, worker `sol-notify-staging`) — deployed automatically by `.github/workflows/release.yml` on every merge to `main`. Real Resend sends, subject prefixed `[STAGING]` (see `src/lib/email-sender.ts`).
+- **`production`** — not yet set up (SOL-29, depends on SOL-16 landing first).
+
+Staging deploy requires these secrets on the GitHub repo: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RELEASE_TOKEN`, `API_KEY_STAGING`, `SOL_API_URL_STAGING`, `SOL_API_KEY_STAGING`, `RESEND_API_KEY_STAGING`.
+
 Local secrets go in `.dev.vars` (gitignored, see `.dev.vars.example`):
 ```
 API_KEY=dev-local-key
@@ -85,4 +93,6 @@ Tests run inside the actual CF Workers runtime via `@cloudflare/vitest-pool-work
 
 - `sol-api` (`../sol-api`) — provides `GET /v1/clients/:clientId` and `POST /v1/notification-logs`, both camelCase (SOL-7).
 - SOL-13 — adds the slack branch to `notification.requested`.
-- SOL-16 / SOL-29 / SOL-17 / SOL-18 — persistent staging env, persistent production env, ephemeral per-PR env, and Bruno collection respectively (not yet built).
+- SOL-16 (staging, this doc) — workflow/config built; deploy is pending the GitHub secrets listed above being added. SOL-29 (production) not yet built, depends on SOL-16 deploying successfully first.
+- SOL-18 (Bruno collection, `bruno/`) — done.
+- SOL-17 — ephemeral per-PR env, detached from SOL-8, tracked standalone. Folds in a future Mailtrap-backed e2e email suite (ported from the old service's `tests/e2e/email/` pattern) rather than sol-api's shallow status-code smoke test style.
