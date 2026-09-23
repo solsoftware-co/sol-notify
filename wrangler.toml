@@ -23,3 +23,13 @@ ENVIRONMENT = "staging"
 
 [env.staging.observability]
 enabled = true
+
+[env.production]
+name = "sol-notify"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+# API_KEY, SOL_API_URL, SOL_API_KEY, RESEND_API_KEY are Cloudflare Secrets — not set here
+
+[env.production.observability]
+enabled = true

@@ -19,9 +19,9 @@ npm run deploy     # deploy to Cloudflare Workers
 
 - **`development`** (local `npm run dev`) — email sends are mocked, see below.
 - **`staging`** (`env.staging` in `wrangler.toml`, worker `sol-notify-staging`) — deployed automatically by `.github/workflows/release.yml` on every merge to `main`. Real Resend sends, subject prefixed `[STAGING]` (see `src/lib/email-sender.ts`).
-- **`production`** — not yet set up (SOL-29, depends on SOL-16 landing first).
+- **`production`** (`env.production`, worker `sol-notify`) — deployed by the same workflow's `deploy-production` job, gated behind the `production` GitHub Environment (required reviewer approval — this repo is public specifically so that gate works on GitHub's free plan; private repos need a paid org plan for required-reviewer protection). Runs after `deploy-staging` succeeds. Real Resend sends, no subject prefix.
 
-Staging deploy requires these secrets on the GitHub repo: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RELEASE_TOKEN`, `API_KEY_STAGING`, `SOL_API_URL_STAGING`, `SOL_API_KEY_STAGING`, `RESEND_API_KEY_STAGING`.
+Staging deploy requires these secrets on the GitHub repo: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RELEASE_TOKEN`, `API_KEY_STAGING`, `SOL_API_URL_STAGING`, `SOL_API_KEY_STAGING`, `RESEND_API_KEY_STAGING`. Production adds: `API_KEY_PRODUCTION`, `SOL_API_URL_PRODUCTION`, `SOL_API_KEY_PRODUCTION`, `RESEND_API_KEY_PRODUCTION`.
 
 Local secrets go in `.dev.vars` (gitignored, see `.dev.vars.example`):
 ```
@@ -93,6 +93,7 @@ Tests run inside the actual CF Workers runtime via `@cloudflare/vitest-pool-work
 
 - `sol-api` (`../sol-api`) — provides `GET /v1/clients/:clientId` and `POST /v1/notification-logs`, both camelCase (SOL-7).
 - SOL-13 — adds the slack branch to `notification.requested`.
-- SOL-16 (staging, this doc) — workflow/config built; deploy is pending the GitHub secrets listed above being added. SOL-29 (production) not yet built, depends on SOL-16 deploying successfully first.
+- SOL-16 (staging, this doc) — done, deployed.
+- SOL-29 (production, this doc) — workflow/config built; deploy is pending the production GitHub secrets listed above being added.
 - SOL-18 (Bruno collection, `bruno/`) — done.
 - SOL-17 — ephemeral per-PR env, detached from SOL-8, tracked standalone. Folds in a future Mailtrap-backed e2e email suite (ported from the old service's `tests/e2e/email/` pattern) rather than sol-api's shallow status-code smoke test style.
