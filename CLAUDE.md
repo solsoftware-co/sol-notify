@@ -21,7 +21,7 @@ npm run deploy     # deploy to Cloudflare Workers
 - **`staging`** (`env.staging` in `wrangler.toml`, worker `sol-notify-staging`) — deployed automatically by `.github/workflows/release.yml` on every merge to `main`. Real Resend sends, subject prefixed `[STAGING]` (see `src/lib/email-sender.ts`).
 - **`production`** (`env.production`, worker `sol-notify`) — deployed by the same workflow's `deploy-production` job, gated behind the `production` GitHub Environment (required reviewer approval — this repo is public specifically so that gate works on GitHub's free plan; private repos need a paid org plan for required-reviewer protection). Runs after `deploy-staging` succeeds. Real Resend sends, no subject prefix.
 
-Staging deploy requires these secrets on the GitHub repo: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RELEASE_TOKEN`, `API_KEY_STAGING`, `SOL_API_URL_STAGING`, `SOL_API_KEY_STAGING`, `RESEND_API_KEY_STAGING`. Production adds: `API_KEY_PRODUCTION`, `SOL_API_URL_PRODUCTION`, `SOL_API_KEY_PRODUCTION`, `RESEND_API_KEY_PRODUCTION`.
+Staging deploy requires these secrets on the GitHub repo: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RELEASE_TOKEN`, `API_KEY_STAGING`, `SOL_API_URL_STAGING`, `SOL_API_KEY_STAGING`, `RESEND_API_KEY` (shared with production — one Resend key covers both). Production adds: `API_KEY_PRODUCTION`, `SOL_API_URL_PRODUCTION`, `SOL_API_KEY_PRODUCTION`.
 
 Local secrets go in `.dev.vars` (gitignored, see `.dev.vars.example`):
 ```
