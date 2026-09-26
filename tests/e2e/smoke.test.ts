@@ -4,7 +4,7 @@ import { waitForEmail, getEmailAttachments, type MailtrapMessage, type MailtrapA
 const PREVIEW_URL = process.env.PREVIEW_URL;
 const API_KEY = process.env.API_KEY_STAGING;
 // Must exist in sol-api's persistent `dev` environment (SOL-31), which is
-// what preview Workers' SOL_API_URL points at.
+// what preview Workers' SOL_API service binding targets.
 const CLIENT_ID = process.env.E2E_CLIENT_ID ?? "sol";
 
 const skip = !PREVIEW_URL;

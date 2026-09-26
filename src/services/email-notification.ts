@@ -42,7 +42,7 @@ export interface PreparedEmail {
 // a 404 — that's a "this request is broken" condition worth surfacing
 // immediately, not deferred to the background.
 export async function prepareEmail(
-  env: { SOL_API_URL: string; SOL_API_KEY: string },
+  env: { SOL_API: Fetcher; SOL_API_KEY: string },
   envelope: EmailEnvelope
 ): Promise<PreparedEmail> {
   const template = emailTemplates[envelope.emailTemplate];
@@ -58,7 +58,7 @@ export async function prepareEmail(
     );
   }
 
-  const client = await getClient(env.SOL_API_URL, env.SOL_API_KEY, envelope.clientId);
+  const client = await getClient(env.SOL_API, env.SOL_API_KEY, envelope.clientId);
 
   // The banner is always an inline attachment referenced by cid:, never a
   // hosted URL — the image itself (the client's own, or the default for a
@@ -96,7 +96,7 @@ export async function prepareEmail(
 // failed log write is logged to console but never re-thrown into
 // waitUntil — there's no caller left to receive that error).
 export async function deliverEmail(
-  env: EmailSenderEnv & { SOL_API_URL: string; SOL_API_KEY: string },
+  env: EmailSenderEnv & { SOL_API: Fetcher; SOL_API_KEY: string },
   prepared: PreparedEmail
 ): Promise<void> {
   const recipientEmail = prepared.recipients.join(", ");
@@ -131,14 +131,14 @@ export async function deliverEmail(
 }
 
 async function logOutcome(
-  env: { SOL_API_URL: string; SOL_API_KEY: string },
+  env: { SOL_API: Fetcher; SOL_API_KEY: string },
   prepared: PreparedEmail,
   outcome: "sent" | "failed",
   extra: { recipientEmail: string; resendId?: string | null; errorMessage?: string }
 ): Promise<void> {
   try {
     await withRetry(() =>
-      writeNotificationLog(env.SOL_API_URL, env.SOL_API_KEY, {
+      writeNotificationLog(env.SOL_API, env.SOL_API_KEY, {
         clientId: prepared.clientId,
         // notification-service has no notion of the caller's own workflow —
         // it only knows clientId/subject/emailTemplate — so workflow/eventName

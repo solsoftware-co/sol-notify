@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import app from "../../../src/index.js";
 import { parseEnvironment, InvalidEnvironmentError } from "../../../src/lib/environment.js";
 
-const BASE_ENV = { API_KEY: "test-api-key", SOL_API_URL: "", SOL_API_KEY: "", RESEND_API_KEY: "" };
+const BASE_ENV = { API_KEY: "test-api-key", SOL_API_KEY: "", RESEND_API_KEY: "" };
 
 describe("parseEnvironment", () => {
   it.each(["development", "preview", "staging", "production"])("accepts %s", (value) => {

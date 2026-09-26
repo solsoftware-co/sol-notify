@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import app from "../../../src/index.js";
 import { setLastEmailPreview } from "../../../src/lib/email-preview-store.js";
 
-const BASE_ENV = { API_KEY: "test-api-key", SOL_API_URL: "", SOL_API_KEY: "", RESEND_API_KEY: "" };
+const BASE_ENV = { API_KEY: "test-api-key", SOL_API_KEY: "", RESEND_API_KEY: "" };
 
 describe("GET /__preview/last-email", () => {
   it("returns the last rendered email as HTML in development", async () => {
@@ -23,7 +23,7 @@ describe("GET /__preview/last-email", () => {
     const res = await app.request(
       "/__preview/last-email",
       {},
-      { ...BASE_ENV, ENVIRONMENT: "development", SOL_API_URL: "unused" }
+      { ...BASE_ENV, ENVIRONMENT: "development" }
     );
     expect(res.status).toBe(200);
   });

@@ -25,7 +25,9 @@ const { prepareEmail, deliverEmail, UnknownEmailTemplateError, InvalidTemplateFi
 const { SolApiNotFoundError } = await import("../../../src/lib/sol-api.js");
 const { DEFAULT_BANNER_URL } = await import("../../../src/lib/banner-config.js");
 
-const SOL_API_ENV = { SOL_API_URL: "https://sol-api.test", SOL_API_KEY: "test-key" };
+// Never actually called — getClient/writeNotificationLog are mocked above,
+// so this only needs to be a distinct object to assert it's passed through.
+const SOL_API_ENV = { SOL_API: { fetch: vi.fn() } as unknown as Fetcher, SOL_API_KEY: "test-key" };
 const FULL_ENV = { ENVIRONMENT: "development", RESEND_API_KEY: "re_test", ...SOL_API_ENV };
 
 const baseEnvelope = {
@@ -55,7 +57,7 @@ beforeEach(() => {
 describe("prepareEmail", () => {
   it("fetches the client and renders HTML for a valid envelope", async () => {
     const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
-    expect(getClientMock).toHaveBeenCalledWith(SOL_API_ENV.SOL_API_URL, SOL_API_ENV.SOL_API_KEY, "acme-corp");
+    expect(getClientMock).toHaveBeenCalledWith(SOL_API_ENV.SOL_API, SOL_API_ENV.SOL_API_KEY, "acme-corp");
     expect(prepared.clientId).toBe("acme-corp");
     expect(prepared.emailTemplate).toBe("mailchimp_confirmation");
     expect(prepared.recipients).toEqual(["sales@acme.com"]);
@@ -194,7 +196,7 @@ describe("deliverEmail", () => {
 
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
     expect(writeNotificationLogMock).toHaveBeenCalledWith(
-      FULL_ENV.SOL_API_URL,
+      FULL_ENV.SOL_API,
       FULL_ENV.SOL_API_KEY,
       expect.objectContaining({ clientId: "acme-corp", outcome: "sent", type: "email", resendId: "resend-1" })
     );
@@ -230,7 +232,7 @@ describe("deliverEmail", () => {
       expect.objectContaining({ html: `<img src="${DEFAULT_BANNER_URL}">`, attachments: [] })
     );
     expect(writeNotificationLogMock).toHaveBeenCalledWith(
-      FULL_ENV.SOL_API_URL,
+      FULL_ENV.SOL_API,
       FULL_ENV.SOL_API_KEY,
       expect.objectContaining({ outcome: "sent" })
     );
@@ -243,7 +245,7 @@ describe("deliverEmail", () => {
     await deliverEmail(FULL_ENV, prepared);
 
     expect(writeNotificationLogMock).toHaveBeenCalledWith(
-      FULL_ENV.SOL_API_URL,
+      FULL_ENV.SOL_API,
       FULL_ENV.SOL_API_KEY,
       expect.objectContaining({ outcome: "sent", resendId: null })
     );
@@ -259,7 +261,7 @@ describe("deliverEmail", () => {
 
     expect(sendEmailMock).toHaveBeenCalledTimes(2);
     expect(writeNotificationLogMock).toHaveBeenCalledWith(
-      FULL_ENV.SOL_API_URL,
+      FULL_ENV.SOL_API,
       FULL_ENV.SOL_API_KEY,
       expect.objectContaining({ outcome: "sent", resendId: "resend-2" })
     );
@@ -272,7 +274,7 @@ describe("deliverEmail", () => {
     await deliverEmail(FULL_ENV, prepared);
 
     expect(writeNotificationLogMock).toHaveBeenCalledWith(
-      FULL_ENV.SOL_API_URL,
+      FULL_ENV.SOL_API,
       FULL_ENV.SOL_API_KEY,
       expect.objectContaining({ outcome: "failed", errorMessage: expect.stringContaining("Resend is down") })
     );

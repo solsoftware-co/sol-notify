@@ -29,10 +29,11 @@ jobs:
       - run: npm run test:unit
 
   # Ephemeral per-PR preview Worker (SOL-17), mirroring sol-api's pr.yml minus
-  # its Neon branch machinery — this service has no database. Runs with
-  # ENVIRONMENT=preview, so sends go to a Mailtrap sandbox inbox (see
-  # src/lib/email-sender.ts) that the e2e suite polls. SOL_API_URL points at
-  # sol-api's persistent `dev` environment (SOL-31), not its staging.
+  # its Neon branch machinery — this service has no database. Deployed as
+  # wrangler.toml's [env.preview] (ENVIRONMENT=preview, so sends go to a
+  # Mailtrap sandbox inbox the e2e suite polls — see src/lib/email-sender.ts)
+  # under a per-PR --name. Its SOL_API service binding targets sol-api's
+  # persistent `dev` Worker (SOL-31), not its staging.
   #
   # Skipped for PRs from forks: this repo is public, and GitHub withholds
   # secrets from fork PRs, so the deploy could never succeed there anyway.
@@ -52,6 +53,14 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # wrangler 3 rejects --name together with --env, so the per-PR Worker
+      # name is written into [env.preview] in this runner's checkout only.
+      # Deploying without --env instead would silently use the top-level
+      # SOL_API binding — production sol-api.
+      - name: Name the preview worker for this PR
+        run: |
+          sed -i 's/^name = "sol-notify-preview"$/name = "'"$WORKER_NAME"'"/' wrangler.toml
+          grep -q "^name = \"$WORKER_NAME\"$" wrangler.toml || { echo "::error::failed to set [env.preview] name"; exit 1; }
       # Code and secrets must go live together, or requests race a
       # half-configured Worker: every secret change is its own new Worker
       # version, rolled out over a few seconds, and /health (which needs no
@@ -68,20 +77,19 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --name ${{ env.WORKER_NAME }} --var ENVIRONMENT:preview
+          command: deploy --env preview
       - name: Set preview worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           API_KEY: ${{ secrets.API_KEY_STAGING }}
-          SOL_API_URL: ${{ secrets.SOL_API_URL_DEV }}
           SOL_API_KEY: ${{ secrets.SOL_API_KEY_DEV }}
           MAILTRAP_API_TOKEN: ${{ secrets.MAILTRAP_API_TOKEN }}
           MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
         run: |
           secrets_file="$RUNNER_TEMP/preview-secrets.json"
           node -e '
-            const keys = ["API_KEY", "SOL_API_URL", "SOL_API_KEY", "MAILTRAP_API_TOKEN", "MAILTRAP_INBOX_ID"];
+            const keys = ["API_KEY", "SOL_API_KEY", "MAILTRAP_API_TOKEN", "MAILTRAP_INBOX_ID"];
             process.stdout.write(JSON.stringify(Object.fromEntries(keys.map((k) => [k, process.env[k]]))));
           ' > "$secrets_file"
           npx wrangler secret bulk "$secrets_file" --name $WORKER_NAME
@@ -92,7 +100,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --name ${{ env.WORKER_NAME }} --var ENVIRONMENT:preview --var APP_VERSION:${{ env.APP_VERSION }}
+          command: deploy --env preview --var APP_VERSION:${{ env.APP_VERSION }}
       - name: Set PREVIEW_URL
         run: echo "PREVIEW_URL=${{ steps.deploy.outputs.deployment-url }}" >> $GITHUB_ENV
       - name: Wait for the final version to be serving

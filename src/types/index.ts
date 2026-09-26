@@ -1,7 +1,8 @@
 export interface Env {
   API_KEY: string;
   ENVIRONMENT: string;
-  SOL_API_URL: string;
+  /** Service binding to the environment's sol-api Worker (see wrangler.toml). */
+  SOL_API: Fetcher;
   SOL_API_KEY: string;
   RESEND_API_KEY: string;
   /** Only set on ephemeral per-PR preview Workers (ENVIRONMENT=preview), which send into a Mailtrap sandbox inbox — see src/lib/email-sender.ts. */

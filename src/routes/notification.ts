@@ -25,9 +25,9 @@ notification.post("/", async (c) => {
   // slack branch here once slackEnvelopeSchema exists.
   const envelope = result.data;
 
-  const solApiEnv = { 
-    SOL_API_URL: c.env.SOL_API_URL, 
-    SOL_API_KEY: c.env.SOL_API_KEY 
+  const solApiEnv = {
+    SOL_API: c.env.SOL_API,
+    SOL_API_KEY: c.env.SOL_API_KEY,
   };
 
   let prepared;

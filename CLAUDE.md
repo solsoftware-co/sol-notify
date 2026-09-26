@@ -19,17 +19,16 @@ npm run deploy     # deploy to Cloudflare Workers
 ## Environments
 
 - **`development`** (local `npm run dev`) — email sends are mocked, see below.
-- **`preview`** (ephemeral, worker `sol-notify-pr-<PR#>`, SOL-17) — deployed by `.github/workflows/pr.yml` on every same-repo PR (fork PRs skipped — no secrets), deleted by `.github/workflows/cleanup.yml` on close. Deployed with `--var ENVIRONMENT:preview`, which puts `email-sender.ts` in **mailtrap** mode: real delivery via Mailtrap's sandbox HTTP API (not nodemailer/SMTP — Workers have no raw TCP sockets) into an inbox no real mailbox receives, subject prefixed `[PREVIEW]`. `SOL_API_URL` points at sol-api's persistent `dev` env (SOL-31), not staging. `tests/e2e/smoke.test.ts` then POSTs a real notification and polls Mailtrap's Testing API (`tests/e2e/helpers/mailtrap.ts`, ported from the old service) to assert on the delivered HTML.
+- **`preview`** (ephemeral, worker `sol-notify-pr-<PR#>`, SOL-17) — deployed by `.github/workflows/pr.yml` on every same-repo PR (fork PRs skipped — no secrets), deleted by `.github/workflows/cleanup.yml` on close. Deployed as `[env.preview]` in `wrangler.toml` (`ENVIRONMENT=preview`; the workflow rewrites that block's `name` to the per-PR Worker name in its own checkout, since wrangler 3 rejects `--name` with `--env`), which puts `email-sender.ts` in **mailtrap** mode: real delivery via Mailtrap's sandbox HTTP API (not nodemailer/SMTP — Workers have no raw TCP sockets) into an inbox no real mailbox receives, subject prefixed `[PREVIEW]`. Its `SOL_API` service binding targets sol-api's persistent `dev` Worker (SOL-31), not staging. `tests/e2e/smoke.test.ts` then POSTs a real notification and polls Mailtrap's Testing API (`tests/e2e/helpers/mailtrap.ts`, ported from the old service) to assert on the delivered HTML.
 - **`staging`** (`env.staging` in `wrangler.toml`, worker `sol-notify-staging`) — deployed automatically by `.github/workflows/release.yml` on every merge to `main`. Real Resend sends, subject prefixed `[STAGING]` (see `src/lib/email-sender.ts`).
 - **`production`** (`env.production`, worker `sol-notify`) — deployed by the same workflow's `deploy-production` job, gated behind the `production` GitHub Environment (required reviewer approval — this repo is public specifically so that gate works on GitHub's free plan; private repos need a paid org plan for required-reviewer protection). Runs after `deploy-staging` succeeds. Real Resend sends, no subject prefix.
 
-Staging deploy requires these secrets on the GitHub repo: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RELEASE_TOKEN`, `API_KEY_STAGING`, `SOL_API_URL_STAGING`, `SOL_API_KEY_STAGING`, `RESEND_API_KEY` (shared with production — one Resend key covers both). Production adds: `API_KEY_PRODUCTION`, `SOL_API_URL_PRODUCTION`, `SOL_API_KEY_PRODUCTION`. PR previews add: `SOL_API_URL_DEV`, `SOL_API_KEY_DEV`, `MAILTRAP_API_TOKEN`, `MAILTRAP_INBOX_ID`, `MAILTRAP_ACCOUNT_ID` (reusing `API_KEY_STAGING` as the preview Worker's inbound key, same as sol-api's previews).
+Staging deploy requires these secrets on the GitHub repo: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RELEASE_TOKEN`, `API_KEY_STAGING`, `SOL_API_KEY_STAGING`, `RESEND_API_KEY` (shared with production — one Resend key covers both). Production adds: `API_KEY_PRODUCTION`, `SOL_API_KEY_PRODUCTION`. PR previews add: `SOL_API_KEY_DEV`, `MAILTRAP_API_TOKEN`, `MAILTRAP_INBOX_ID`, `MAILTRAP_ACCOUNT_ID` (reusing `API_KEY_STAGING` as the preview Worker's inbound key, same as sol-api's previews).
 
 Local secrets go in `.dev.vars` (gitignored, see `.dev.vars.example`):
 ```
 API_KEY=dev-local-key
 ENVIRONMENT=development
-SOL_API_URL=http://localhost:8787
 SOL_API_KEY=dev-local-key
 RESEND_API_KEY=re_xxx
 ```
@@ -40,7 +39,7 @@ In `development`, email sending is mocked — no real send happens. Instead of d
 
 ## Architecture
 
-**Stack**: Hono 4.x → Cloudflare Workers (V8 isolate), no database. Client config and the audit-log trail both live behind `sol-api` (`../sol-api`), reached over HTTP with `X-API-Key` auth via `SOL_API_URL`/`SOL_API_KEY`.
+**Stack**: Hono 4.x → Cloudflare Workers (V8 isolate), no database. Client config and the audit-log trail both live behind `sol-api` (`../sol-api`), reached through a **service binding** (`env.SOL_API`, declared per environment in `wrangler.toml`: local → `sol-api`, preview → `sol-api-dev`, staging → `sol-api-staging`, production → `sol-api`) with `X-API-Key` auth via `SOL_API_KEY`. No sol-api URL is configured anywhere — Worker-to-Worker calls stay inside Cloudflare (a plain `fetch()` to another Worker on the same `workers.dev` subdomain fails with error 1042 anyway). Locally, `wrangler dev` connects the binding to sol-api's own `npm run dev` session automatically, so run both. Unit tests get a stand-in `SOL_API` from `vitest.config.ts`.
 
 This service is the new replacement for `sol-notification-service` (formerly `sol-notificaiton-service`, still live on Vercel + Inngest), built piece by piece per the design board's step plan. **First pass is email-only** — `type: "slack"` is separately ticketed as SOL-13 and not implemented here yet.
 

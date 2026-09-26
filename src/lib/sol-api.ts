@@ -1,6 +1,7 @@
 // Typed HTTP client for sol-api. This service holds no database of its own —
 // client config and the audit-log trail both live behind sol-api, reached
-// over HTTP with X-API-Key auth. Calls the new camelCase routes shipped by
+// through the SOL_API service binding (see wrangler.toml) with X-API-Key
+// auth. Calls the new camelCase routes shipped by
 // sol-api's SOL-7 (client) and SOL-7 PR4 (notification-logs) work.
 
 const FETCH_TIMEOUT_MS = 10_000;
@@ -16,8 +17,12 @@ export class SolApiNotFoundError extends Error {
   }
 }
 
+// Requests go through the binding, never the public internet — the host in
+// this base URL is ignored by a service binding; only the path matters.
+const BINDING_BASE_URL = "https://sol-api";
+
 async function solApiFetch<T>(
-  baseUrl: string,
+  solApi: Fetcher,
   apiKey: string,
   path: string,
   init?: RequestInit
@@ -27,7 +32,7 @@ async function solApiFetch<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}${path}`, {
+    response = await solApi.fetch(`${BINDING_BASE_URL}${path}`, {
       ...init,
       headers: {
         "X-API-Key": apiKey,
@@ -71,8 +76,8 @@ export interface ClientMinimal {
   createdAt: string;
 }
 
-export async function getClient(baseUrl: string, apiKey: string, clientId: string): Promise<ClientMinimal> {
-  return solApiFetch<ClientMinimal>(baseUrl, apiKey, `/v1/clients/${encodeURIComponent(clientId)}`);
+export async function getClient(solApi: Fetcher, apiKey: string, clientId: string): Promise<ClientMinimal> {
+  return solApiFetch<ClientMinimal>(solApi, apiKey, `/v1/clients/${encodeURIComponent(clientId)}`);
 }
 
 export interface NotificationLogEntry {
@@ -89,11 +94,11 @@ export interface NotificationLogEntry {
 }
 
 export async function writeNotificationLog(
-  baseUrl: string,
+  solApi: Fetcher,
   apiKey: string,
   entry: NotificationLogEntry
 ): Promise<void> {
-  await solApiFetch<unknown>(baseUrl, apiKey, "/v1/notification-logs", {
+  await solApiFetch<unknown>(solApi, apiKey, "/v1/notification-logs", {
     method: "POST",
     body: JSON.stringify(entry),
   });
