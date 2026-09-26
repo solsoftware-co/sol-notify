@@ -4,6 +4,9 @@ export interface Env {
   SOL_API_URL: string;
   SOL_API_KEY: string;
   RESEND_API_KEY: string;
+  /** Only set on ephemeral per-PR preview Workers (ENVIRONMENT=preview), which send into a Mailtrap sandbox inbox — see src/lib/email-sender.ts. */
+  MAILTRAP_API_TOKEN?: string;
+  MAILTRAP_INBOX_ID?: string;
   /** Released package.json version, injected at deploy time by CI (release.yml). Unset locally. */
   APP_VERSION?: string;
 }

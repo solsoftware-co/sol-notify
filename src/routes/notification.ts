@@ -61,6 +61,8 @@ notification.post("/", async (c) => {
       {
         ENVIRONMENT: c.env.ENVIRONMENT,
         RESEND_API_KEY: c.env.RESEND_API_KEY,
+        MAILTRAP_API_TOKEN: c.env.MAILTRAP_API_TOKEN,
+        MAILTRAP_INBOX_ID: c.env.MAILTRAP_INBOX_ID,
         ...solApiEnv,
       },
       prepared

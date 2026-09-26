@@ -34,9 +34,9 @@ export interface MailchimpConfirmationEmailProps {
    * ctaLabel defaults to "View in Mailchimp" if a URL is given without one. */
   ctaUrl?: string;
   ctaLabel?: string;
-  /** Always set by the caller — either the client's own banner (from
-   * clients.settings.banner) or the default Sol Software one. There is no
-   * "no banner" case. */
+  /** Always the inline attachment reference ("cid:banner_image") — the image
+   * itself (the client's own banner, or the default) is downloaded and
+   * attached at send time. There is no "no banner" case. */
   bannerUrl: string;
   bannerHeight?: number;
   bannerWidth?: number;

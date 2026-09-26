@@ -2,10 +2,11 @@ import { render } from "@react-email/render";
 import { emailTemplates } from "../emails/registry.js";
 import type { EmailEnvelope } from "../validators/notification.js";
 import { getClient, writeNotificationLog } from "../lib/sol-api.js";
-import { sendEmail } from "../lib/email-sender.js";
+import { sendEmail, type EmailSenderEnv } from "../lib/email-sender.js";
 import { withRetry } from "../lib/retry.js";
 import { logger } from "../lib/logger.js";
-import { parseBannerConfig, DEFAULT_BANNER_URL } from "../lib/banner-config.js";
+import { parseBannerConfig } from "../lib/banner-config.js";
+import { BANNER_CID_SRC, loadBannerAttachment, withHotlinkedBanner } from "../lib/banner-attachment.js";
 
 export class UnknownEmailTemplateError extends Error {
   constructor(message: string) {
@@ -30,6 +31,9 @@ export interface PreparedEmail {
   recipients: string[];
   subject: string;
   html: string;
+  /** The client's own banner URL, fetched and attached at send time (see
+   * lib/banner-attachment.ts). Unset means the default banner. */
+  bannerImageUrl?: string;
 }
 
 // Synchronous half: validate fields against the template's own schema
@@ -56,10 +60,10 @@ export async function prepareEmail(
 
   const client = await getClient(env.SOL_API_URL, env.SOL_API_KEY, envelope.clientId);
 
-  // A client's own banner overrides the default Sol Software one; a client
-  // with no (or invalid) banner settings still gets a banner, just the
-  // default — matching the old service's behavior, where a banner was never
-  // simply absent.
+  // The banner is always an inline attachment referenced by cid:, never a
+  // hosted URL — the image itself (the client's own, or the default for a
+  // client with no/invalid banner settings) is only downloaded in
+  // deliverEmail, so fetching it never delays this response.
   const banner = parseBannerConfig(client.settings);
 
   const Component = template.component;
@@ -71,7 +75,7 @@ export async function prepareEmail(
       fields: parsedFields.data as Record<string, string>,
       ctaUrl: envelope.cta?.url,
       ctaLabel: envelope.cta?.label,
-      bannerUrl: banner.imageUrl ?? DEFAULT_BANNER_URL,
+      bannerUrl: BANNER_CID_SRC,
       bannerHeight: banner.height,
       bannerWidth: banner.width,
     })
@@ -83,6 +87,7 @@ export async function prepareEmail(
     recipients: envelope.recipients,
     subject: envelope.subject,
     html,
+    bannerImageUrl: banner.imageUrl,
   };
 }
 
@@ -91,17 +96,29 @@ export async function prepareEmail(
 // failed log write is logged to console but never re-thrown into
 // waitUntil — there's no caller left to receive that error).
 export async function deliverEmail(
-  env: { ENVIRONMENT: string; RESEND_API_KEY: string; SOL_API_URL: string; SOL_API_KEY: string },
+  env: EmailSenderEnv & { SOL_API_URL: string; SOL_API_KEY: string },
   prepared: PreparedEmail
 ): Promise<void> {
   const recipientEmail = prepared.recipients.join(", ");
 
   try {
+    // Resolved once, outside withRetry — a send retry shouldn't re-fetch the
+    // image. Never throws: if no banner could be downloaded at all, the
+    // email goes out with the default banner hotlinked instead.
+    const banner = await loadBannerAttachment(prepared.bannerImageUrl);
     const result = await withRetry(() =>
-      sendEmail(env, { to: prepared.recipients, subject: prepared.subject, html: prepared.html })
+      sendEmail(env, {
+        to: prepared.recipients,
+        subject: prepared.subject,
+        html: banner ? prepared.html : withHotlinkedBanner(prepared.html),
+        attachments: banner ? [banner] : [],
+      })
     );
 
-    await logOutcome(env, prepared, "sent", { recipientEmail, resendId: result.resendId });
+    await logOutcome(env, prepared, "sent", {
+      recipientEmail,
+      resendId: result.mode === "resend" ? result.resendId : null,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error("email delivery failed permanently", {

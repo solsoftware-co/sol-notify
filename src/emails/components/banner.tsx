@@ -1,10 +1,10 @@
 import { Img } from "@react-email/components";
 import { spacing } from "../styles";
 
-// Simplified from the old service's version: this takes a plain hosted image
-// URL directly instead of a CID attachment reference (loadBannerAttachment's
-// fetch-and-base64-embed step is dropped entirely — Resend serves remote
-// image URLs natively, so there's nothing to embed).
+// `src` is always the inline attachment reference (BANNER_CID_SRC,
+// "cid:banner_image"), not a hosted URL — the image is downloaded and
+// attached to each email at send time so it keeps rendering even if its
+// source URL later stops serving. See lib/banner-attachment.ts.
 export interface BannerProps {
   src?: string;
   height?: number;

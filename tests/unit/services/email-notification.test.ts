@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { EmailEnvelope } from "../../../src/validators/notification.js";
-import { DEFAULT_BANNER_URL } from "../../../src/lib/banner-config.js";
 
 const getClientMock = vi.fn();
 const writeNotificationLogMock = vi.fn();
@@ -24,6 +23,7 @@ const { prepareEmail, deliverEmail, UnknownEmailTemplateError, InvalidTemplateFi
   "../../../src/services/email-notification.js"
 );
 const { SolApiNotFoundError } = await import("../../../src/lib/sol-api.js");
+const { DEFAULT_BANNER_URL } = await import("../../../src/lib/banner-config.js");
 
 const SOL_API_ENV = { SOL_API_URL: "https://sol-api.test", SOL_API_KEY: "test-key" };
 const FULL_ENV = { ENVIRONMENT: "development", RESEND_API_KEY: "re_test", ...SOL_API_ENV };
@@ -90,9 +90,10 @@ describe("prepareEmail", () => {
     await expect(prepareEmail(SOL_API_ENV, baseEnvelope)).rejects.toBeInstanceOf(SolApiNotFoundError);
   });
 
-  it("falls back to the permanently-hosted default banner when the client has no banner settings", async () => {
+  it("references the banner as an inline attachment, with no client URL when the client has no banner settings", async () => {
     const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
-    expect(prepared.html).toContain(DEFAULT_BANNER_URL);
+    expect(prepared.html).toContain('src="cid:banner_image"');
+    expect(prepared.bannerImageUrl).toBeUndefined();
   });
 
   it("uses the client's own banner when settings.banner.imageUrl is set", async () => {
@@ -107,8 +108,12 @@ describe("prepareEmail", () => {
     });
 
     const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
-    expect(prepared.html).toContain("https://acme.example.com/logo.png");
-    expect(prepared.html).not.toContain(DEFAULT_BANNER_URL);
+    // Never hotlinked — the URL is only carried forward for deliverEmail to
+    // fetch and attach.
+    expect(prepared.html).toContain('src="cid:banner_image"');
+    expect(prepared.html).not.toContain("https://acme.example.com/logo.png");
+    expect(prepared.bannerImageUrl).toBe("https://acme.example.com/logo.png");
+    expect(prepared.html).toContain('height="60"');
   });
 
   it("drops an invalid banner imageUrl and falls back to the default rather than failing the email", async () => {
@@ -123,7 +128,8 @@ describe("prepareEmail", () => {
     });
 
     const prepared = await prepareEmail(SOL_API_ENV, baseEnvelope);
-    expect(prepared.html).toContain(DEFAULT_BANNER_URL);
+    expect(prepared.html).toContain('src="cid:banner_image"');
+    expect(prepared.bannerImageUrl).toBeUndefined();
   });
 
   it("renders no CTA button when cta isn't provided", async () => {
@@ -161,6 +167,17 @@ describe("prepareEmail", () => {
 });
 
 describe("deliverEmail", () => {
+  // Every deliverEmail call downloads a banner first — stubbed here so no
+  // test reaches the real network. Individual tests override it.
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Uint8Array([1]), { headers: { "content-type": "image/png" } })
+    );
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   const prepared = {
     clientId: "acme-corp",
     emailTemplate: "mailchimp_confirmation",
@@ -170,7 +187,7 @@ describe("deliverEmail", () => {
   };
 
   it("logs outcome sent on a successful send", async () => {
-    sendEmailMock.mockResolvedValue({ mode: "mock", resendId: "resend-1" });
+    sendEmailMock.mockResolvedValue({ mode: "resend", resendId: "resend-1" });
     writeNotificationLogMock.mockResolvedValue(undefined);
 
     await deliverEmail(FULL_ENV, prepared);
@@ -183,10 +200,59 @@ describe("deliverEmail", () => {
     );
   });
 
+  it("attaches the downloaded banner inline", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } })
+    );
+    sendEmailMock.mockResolvedValue({ mode: "mock" });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+
+    await deliverEmail(FULL_ENV, { ...prepared, html: '<img src="cid:banner_image">' });
+
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      FULL_ENV,
+      expect.objectContaining({
+        html: '<img src="cid:banner_image">',
+        attachments: [expect.objectContaining({ contentId: "banner_image", content: "AQID" })],
+      })
+    );
+  });
+
+  it("still sends, with the default banner hotlinked, when no banner can be downloaded", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
+    sendEmailMock.mockResolvedValue({ mode: "mock" });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+
+    await deliverEmail(FULL_ENV, { ...prepared, html: '<img src="cid:banner_image">' });
+
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      FULL_ENV,
+      expect.objectContaining({ html: `<img src="${DEFAULT_BANNER_URL}">`, attachments: [] })
+    );
+    expect(writeNotificationLogMock).toHaveBeenCalledWith(
+      FULL_ENV.SOL_API_URL,
+      FULL_ENV.SOL_API_KEY,
+      expect.objectContaining({ outcome: "sent" })
+    );
+  });
+
+  it("logs a null resendId for a non-Resend send, never another provider's id", async () => {
+    sendEmailMock.mockResolvedValue({ mode: "mailtrap", mailtrapMessageIds: ["mt-1"] });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+
+    await deliverEmail(FULL_ENV, prepared);
+
+    expect(writeNotificationLogMock).toHaveBeenCalledWith(
+      FULL_ENV.SOL_API_URL,
+      FULL_ENV.SOL_API_KEY,
+      expect.objectContaining({ outcome: "sent", resendId: null })
+    );
+  });
+
   it("retries a transient send failure and logs the eventual success, not the first failure", async () => {
     sendEmailMock
       .mockRejectedValueOnce(new Error("temporary Resend outage"))
-      .mockResolvedValueOnce({ mode: "live", resendId: "resend-2" });
+      .mockResolvedValueOnce({ mode: "resend", resendId: "resend-2" });
     writeNotificationLogMock.mockResolvedValue(undefined);
 
     await deliverEmail(FULL_ENV, prepared);
@@ -213,7 +279,7 @@ describe("deliverEmail", () => {
   });
 
   it("never throws even if the log write itself fails — nothing is listening in waitUntil", async () => {
-    sendEmailMock.mockResolvedValue({ mode: "mock", resendId: null });
+    sendEmailMock.mockResolvedValue({ mode: "mock" });
     writeNotificationLogMock.mockRejectedValue(new Error("sol-api unreachable"));
 
     await expect(deliverEmail(FULL_ENV, prepared)).resolves.toBeUndefined();

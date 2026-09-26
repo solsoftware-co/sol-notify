@@ -4,6 +4,16 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# One preview deploy per PR at a time — a new push supersedes an in-flight
+# run rather than racing it to deploy the same sol-notify-pr-<N> Worker.
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   unit-test:
     name: Unit tests
@@ -16,4 +26,105 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run type-check
-      - run: npm test
+      - run: npm run test:unit
+
+  # Ephemeral per-PR preview Worker (SOL-17), mirroring sol-api's pr.yml minus
+  # its Neon branch machinery — this service has no database. Runs with
+  # ENVIRONMENT=preview, so sends go to a Mailtrap sandbox inbox (see
+  # src/lib/email-sender.ts) that the e2e suite polls. SOL_API_URL points at
+  # sol-api's persistent `dev` environment (SOL-31), not its staging.
+  #
+  # Skipped for PRs from forks: this repo is public, and GitHub withholds
+  # secrets from fork PRs, so the deploy could never succeed there anyway.
+  preview:
+    name: Preview deploy + E2E
+    needs: unit-test
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      WORKER_NAME: sol-notify-pr-${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Deploy preview worker
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --name ${{ env.WORKER_NAME }} --var ENVIRONMENT:preview --var APP_VERSION:pr-${{ github.event.pull_request.number }}
+      - name: Set preview worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "${{ secrets.API_KEY_STAGING }}" | npx wrangler secret put API_KEY --name $WORKER_NAME
+          echo "${{ secrets.SOL_API_URL_DEV }}" | npx wrangler secret put SOL_API_URL --name $WORKER_NAME
+          echo "${{ secrets.SOL_API_KEY_DEV }}" | npx wrangler secret put SOL_API_KEY --name $WORKER_NAME
+          echo "${{ secrets.MAILTRAP_API_TOKEN }}" | npx wrangler secret put MAILTRAP_API_TOKEN --name $WORKER_NAME
+          echo "${{ secrets.MAILTRAP_INBOX_ID }}" | npx wrangler secret put MAILTRAP_INBOX_ID --name $WORKER_NAME
+      - name: Set PREVIEW_URL
+        run: echo "PREVIEW_URL=${{ steps.deploy.outputs.deployment-url }}" >> $GITHUB_ENV
+      - name: Wait for Worker to become reachable
+        run: |
+          if [ -z "$PREVIEW_URL" ]; then
+            echo "::error::wrangler-action did not report a deployment URL"
+            exit 1
+          fi
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$PREVIEW_URL/health" || echo "000")
+            if [ "$status" = "200" ]; then
+              echo "Worker reachable after $((i * 2))s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Worker did not become reachable within 60s (last status: $status)"
+          exit 1
+      - name: Run E2E smoke tests
+        run: npm run test:e2e
+        env:
+          PREVIEW_URL: ${{ env.PREVIEW_URL }}
+          API_KEY_STAGING: ${{ secrets.API_KEY_STAGING }}
+          MAILTRAP_API_TOKEN: ${{ secrets.MAILTRAP_API_TOKEN }}
+          MAILTRAP_ACCOUNT_ID: ${{ secrets.MAILTRAP_ACCOUNT_ID }}
+          MAILTRAP_INBOX_ID: ${{ secrets.MAILTRAP_INBOX_ID }}
+      - name: Post preview URL comment
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ env.PREVIEW_URL }}
+        with:
+          script: |
+            const url = process.env.PREVIEW_URL;
+            const success = '${{ job.status }}' !== 'failure';
+            const icon = success ? '🚀' : '❌';
+            const body = success
+              ? `<!-- preview-url -->\n## Preview Deployment ${icon}\n**URL**: ${url}\n\nE2E smoke tests passed — a real email was rendered, delivered to the Mailtrap sandbox, and checked.`
+              : `<!-- preview-url -->\n## Preview Deployment ${icon}\nDeployment or E2E tests failed. Check the [Actions log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes('<!-- preview-url -->'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
