@@ -4,6 +4,7 @@ import { requireApiKey } from "./middleware/auth.js";
 import health from "./routes/health.js";
 import notification from "./routes/notification.js";
 import preview from "./routes/preview.js";
+import { parseEnvironment } from "./lib/environment.js";
 import type { AppEnv } from "./types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -11,6 +12,11 @@ const app = new Hono<AppEnv>();
 app.onError(errorHandler);
 app.use("*", async (c, next) => {
   c.set("requestId", crypto.randomUUID());
+  // Fail fast on a misconfigured ENVIRONMENT, on every route (including
+  // /health, so a bad preview deploy fails pr.yml's reachability check) —
+  // rather than only discovering it inside the backgrounded send, where the
+  // error could only be logged, never returned to anyone.
+  parseEnvironment(c.env.ENVIRONMENT);
   await next();
 });
 

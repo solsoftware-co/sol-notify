@@ -90,7 +90,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           echo "${{ secrets.API_KEY_STAGING }}" | npx wrangler secret put API_KEY --env staging
-          echo "${{ secrets.SOL_API_URL_STAGING }}" | npx wrangler secret put SOL_API_URL --env staging
           echo "${{ secrets.SOL_API_KEY_STAGING }}" | npx wrangler secret put SOL_API_KEY --env staging
           echo "${{ secrets.RESEND_API_KEY }}" | npx wrangler secret put RESEND_API_KEY --env staging
 
@@ -122,6 +121,5 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           echo "${{ secrets.API_KEY_PRODUCTION }}" | npx wrangler secret put API_KEY --env production
-          echo "${{ secrets.SOL_API_URL_PRODUCTION }}" | npx wrangler secret put SOL_API_URL --env production
           echo "${{ secrets.SOL_API_KEY_PRODUCTION }}" | npx wrangler secret put SOL_API_KEY --env production
           echo "${{ secrets.RESEND_API_KEY }}" | npx wrangler secret put RESEND_API_KEY --env production

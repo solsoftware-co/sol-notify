@@ -1,7 +1,8 @@
-// Permanently hosted — not tied to any particular deployment/environment,
-// unlike the local-static-asset approach this replaced. A client's own
-// banner (from clients.settings.banner) overrides this; a client with no
-// (or invalid) banner settings gets this instead, never no banner at all.
+// Fetched at send time and attached to the email (see banner-attachment.ts),
+// so this only needs to be serving when an email is *sent* — emails already
+// delivered carry their own copy. A client's own banner (from
+// clients.settings.banner) overrides this; a client with no (or invalid)
+// banner settings gets this instead, never no banner at all.
 export const DEFAULT_BANNER_URL = "https://www.solsoftware.co/image/logo.png";
 
 export interface BannerConfig {
@@ -14,8 +15,8 @@ export interface BannerConfig {
 // independently and silently drops invalid ones rather than failing the
 // whole email — a client's custom banner is a nice-to-have, never worth
 // blocking a notification over. A client with no (or invalid) banner
-// settings gets an empty config here; the caller falls back to the default
-// Sol Software banner in that case, not no banner at all.
+// settings gets an empty config here; the default Sol Software banner
+// (DEFAULT_BANNER_URL) is attached in that case, never no banner at all.
 export function parseBannerConfig(settings: Record<string, unknown>): BannerConfig {
   const raw = settings.banner;
   if (!raw || typeof raw !== "object") return {};
