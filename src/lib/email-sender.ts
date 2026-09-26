@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { logger } from "./logger.js";
 import { setLastEmailPreview } from "./email-preview-store.js";
 import { parseEnvironment } from "./environment.js";
+import { NonRetryableError, isRetryableStatus } from "./retry.js";
 
 export interface EmailAttachment {
   filename: string;
@@ -84,7 +85,8 @@ async function sendViaResend(env: EmailSenderEnv, request: SendEmailRequest): Pr
   });
 
   if (error) {
-    throw new Error(`Resend send failed: ${error.message}`);
+    const message = `Resend send failed: ${error.message}`;
+    throw isRetryableStatus(error.statusCode) ? new Error(message) : new NonRetryableError(message);
   }
 
   // Resend's response is itself a discriminated union — once `error` is
@@ -97,7 +99,7 @@ async function sendViaResend(env: EmailSenderEnv, request: SendEmailRequest): Pr
 // Workers runtime doesn't provide, whereas this is a plain fetch.
 async function sendViaMailtrap(env: EmailSenderEnv, request: SendEmailRequest): Promise<SendEmailResult> {
   if (!env.MAILTRAP_API_TOKEN || !env.MAILTRAP_INBOX_ID) {
-    throw new Error("MAILTRAP_API_TOKEN and MAILTRAP_INBOX_ID are required in preview");
+    throw new NonRetryableError("MAILTRAP_API_TOKEN and MAILTRAP_INBOX_ID are required in preview");
   }
 
   const response = await fetch(`${MAILTRAP_SANDBOX_SEND_URL}/${encodeURIComponent(env.MAILTRAP_INBOX_ID)}`, {
@@ -128,7 +130,8 @@ async function sendViaMailtrap(env: EmailSenderEnv, request: SendEmailRequest): 
 
   if (!response.ok || !body?.success) {
     const detail = body && !body.success ? body.errors.join("; ") : `HTTP ${response.status}`;
-    throw new Error(`Mailtrap send failed: ${detail}`);
+    const message = `Mailtrap send failed (HTTP ${response.status}): ${detail}`;
+    throw isRetryableStatus(response.status) ? new Error(message) : new NonRetryableError(message);
   }
 
   return { mode: "mailtrap", mailtrapMessageIds: body.message_ids };

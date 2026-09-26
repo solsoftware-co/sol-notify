@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { sendEmail } from "../../../src/lib/email-sender.js";
 import { getLastEmailPreview } from "../../../src/lib/email-preview-store.js";
+import { NonRetryableError } from "../../../src/lib/retry.js";
 
 const REQUEST = { to: ["jane@example.com"], subject: "New lead", html: "<p>hi</p>" };
 const BANNER = { filename: "banner.png", content: "AQID", contentType: "image/png", contentId: "banner_image" };
@@ -46,12 +47,24 @@ describe("sendEmail — mailtrap mode (ENVIRONMENT=preview)", () => {
     ]);
   });
 
-  it("throws with Mailtrap's error detail on a failed send, so withRetry can retry it", async () => {
+  it("throws a NonRetryableError for a rejected credential, so withRetry doesn't hammer Mailtrap", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       Response.json({ success: false, errors: ["Unauthorized"] }, { status: 401 })
     );
 
-    await expect(sendEmail(PREVIEW_ENV, REQUEST)).rejects.toThrow("Mailtrap send failed: Unauthorized");
+    const err = await sendEmail(PREVIEW_ENV, REQUEST).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NonRetryableError);
+    expect((err as Error).message).toBe("Mailtrap send failed (HTTP 401): Unauthorized");
+  });
+
+  it.each([429, 500, 503])("throws a retryable error for HTTP %i", async (status) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ success: false, errors: ["try later"] }, { status })
+    );
+
+    const err = await sendEmail(PREVIEW_ENV, REQUEST).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(NonRetryableError);
   });
 
   it("throws without sending if the Mailtrap secrets are missing", async () => {
