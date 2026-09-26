@@ -8,7 +8,12 @@ export interface MailtrapMessage {
   to_email: string;
   from_email: string;
   created_at: string;
+  /** Mailtrap's formatted HTML — processed for its web viewer (e.g. inline
+   * cid: images swapped for Mailtrap-hosted URLs). Fine for content checks. */
   html_body: string;
+  /** The HTML exactly as sent — use this to check anything Mailtrap's
+   * formatting rewrites, like cid: references. */
+  html_source: string;
 }
 
 /** Testing API attachment metadata. The package's top-level `Attachment`
@@ -66,7 +71,10 @@ export async function waitForEmail(
     );
 
     if (match) {
-      const html_body = await client.testing.messages.getHtmlMessage(inboxId, match.id);
+      const [html_body, html_source] = await Promise.all([
+        client.testing.messages.getHtmlMessage(inboxId, match.id),
+        client.testing.messages.getMessageHtmlSource(inboxId, match.id),
+      ]);
       return {
         id: match.id,
         subject: match.subject,
@@ -74,6 +82,7 @@ export async function waitForEmail(
         from_email: match.from_email,
         created_at: match.created_at,
         html_body,
+        html_source,
       };
     }
 

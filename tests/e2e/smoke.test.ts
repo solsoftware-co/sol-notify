@@ -118,7 +118,9 @@ describe.skipIf(skip)("E2E smoke tests", () => {
       expect(banner).toBeDefined();
       expect(banner?.content_type).toMatch(/^image\//);
       expect(banner?.attachment_size).toBeGreaterThan(0);
-      expect(email.html_body).toContain('src="cid:banner_image"');
+      // The sent source, not html_body: Mailtrap's formatted HTML rewrites
+      // cid: references to its own hosted URLs for display.
+      expect(email.html_source).toContain('src="cid:banner_image"');
     });
 
     it("contains no raw template syntax", () => {
