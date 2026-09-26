@@ -40,7 +40,16 @@ async function solApiFetch<T>(
     clearTimeout(timeout);
   }
 
-  const body = (await response.json()) as ApiEnvelope<T>;
+  // Read as text first so a non-JSON response (e.g. a Cloudflare error page
+  // like "error code: 1042") surfaces with its status and body, rather than
+  // as an opaque JSON SyntaxError.
+  const text = await response.text();
+  let body: ApiEnvelope<T>;
+  try {
+    body = JSON.parse(text) as ApiEnvelope<T>;
+  } catch {
+    throw new Error(`sol-api returned non-JSON (HTTP ${response.status}): ${text.slice(0, 200).trim()}`);
+  }
 
   if (!body.success) {
     if (response.status === 404) {

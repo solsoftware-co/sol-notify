@@ -1,7 +1,12 @@
 name = "sol-notify"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
+# global_fetch_strictly_public: route outbound fetch() over the public
+# internet. Without it, calling sol-api on the same account's workers.dev
+# subdomain fails with Cloudflare "error code: 1042" (Worker-to-Worker
+# fetch on the same zone). A service binding would avoid the public hop
+# entirely — not done yet.
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 [dev]
 ip = "0.0.0.0"
