@@ -1,3 +1,17 @@
+# [1.2.0](https://github.com/solsoftware-co/sol-notify/compare/v1.1.0...v1.2.0) (2026-09-26)
+
+
+### Bug Fixes
+
+* allow Worker-to-Worker fetch to sol-api on workers.dev ([613dc2b](https://github.com/solsoftware-co/sol-notify/commit/613dc2b1990b3a58c77525830f8c9fec6cebf4fe))
+* **ci:** wait for a fully configured preview version before e2e ([fda784c](https://github.com/solsoftware-co/sol-notify/commit/fda784c4c75853ef7695f62dd8c502af5faca93b))
+* don't retry email sends that fail with a non-retryable 4xx ([53972ac](https://github.com/solsoftware-co/sol-notify/commit/53972ac9f23f2855d9d9a21b6b82f296ee610184))
+
+
+### Features
+
+* add ephemeral per-PR preview env with Mailtrap e2e suite (SOL-17) ([0642237](https://github.com/solsoftware-co/sol-notify/commit/0642237303da513b510e88af85e8dfc630ffc4af))
+
 # [1.1.0](https://github.com/solsoftware-co/sol-notify/compare/v1.0.0...v1.1.0) (2026-09-23)
 
 
