@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/solsoftware-co/sol-notify/compare/v1.2.0...v1.3.0) (2026-09-30)
+
+
+### Features
+
+* add form_submission email template with integration results (SOL-34) ([c96d8da](https://github.com/solsoftware-co/sol-notify/commit/c96d8da450bfaaa10b3eb8e99c380b5c79e027f9))
+
 # [1.2.0](https://github.com/solsoftware-co/sol-notify/compare/v1.1.0...v1.2.0) (2026-09-26)
 
 
