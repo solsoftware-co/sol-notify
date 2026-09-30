@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { waitForEmail, getEmailAttachments, type MailtrapMessage, type MailtrapAttachment } from "./helpers/mailtrap.js";
+import {
+  waitForEmail,
+  waitForSandboxSendSlot,
+  getEmailAttachments,
+  type MailtrapMessage,
+  type MailtrapAttachment,
+} from "./helpers/mailtrap.js";
 
 const PREVIEW_URL = process.env.PREVIEW_URL;
 const API_KEY = process.env.API_KEY_STAGING;
@@ -78,6 +84,7 @@ describe.skipIf(skip)("E2E smoke tests", () => {
     let attachments: MailtrapAttachment[];
 
     beforeAll(async () => {
+      await waitForSandboxSendSlot();
       const triggeredAt = new Date(Date.now() - 5_000); // tolerate clock skew vs. Mailtrap
       const res = await post(
         emailEnvelope({
@@ -144,6 +151,7 @@ describe.skipIf(skip)("E2E smoke tests", () => {
     let email: MailtrapMessage;
 
     beforeAll(async () => {
+      await waitForSandboxSendSlot();
       const triggeredAt = new Date(Date.now() - 5_000); // tolerate clock skew vs. Mailtrap
       const res = await post(
         emailEnvelope({
