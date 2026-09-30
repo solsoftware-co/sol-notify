@@ -1,0 +1,48 @@
+meta {
+  name: Send Notification (Form Submission)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/
+  body: json
+  auth: none
+}
+
+headers {
+  X-API-Key: {{apiKey}}
+}
+
+body:json {
+  {
+    "clientId": "acme-corp",
+    "type": "email",
+    "recipients": ["sales@acme.com"],
+    "subject": "New contact form submission",
+    "emailTemplate": "form_submission",
+    "fields": {
+      "submission": {
+        "name": "Jane Doe",
+        "email": "jane@example.com",
+        "message": "Looking for a quote on a new site."
+      },
+      "integrations": [
+        {
+          "name": "Mailchimp",
+          "outcome": "succeeded",
+          "url": "https://us1.admin.mailchimp.com/lists/members/view?id=123"
+        },
+        {
+          "name": "Google Sheets",
+          "outcome": "failed",
+          "detail": "Spreadsheet permission denied"
+        }
+      ]
+    },
+    "cta": {
+      "url": "mailto:jane@example.com",
+      "label": "Reply to Jane Doe"
+    }
+  }
+}

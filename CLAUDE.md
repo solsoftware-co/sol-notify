@@ -55,8 +55,11 @@ src/
 ├── services/email-notification.ts   # prepareEmail() (sync) + deliverEmail() (backgrounded) — see request flow below
 ├── emails/
 │   ├── styles.ts                    # design tokens, ported from the old service
-│   ├── components/                  # shared primitives (EmailContainer, EmailHeader, EmailFooter, Banner, SectionDivider, FieldGroup, LabelText), ported from sales-lead-v1.tsx
-│   ├── templates/mailchimp-confirmation.tsx   # first template
+│   ├── components/                  # shared primitives (EmailContainer, EmailHeader, EmailFooter, Banner, SectionDivider, FieldGroup, LabelText), ported from sales-lead-v1.tsx; IntegrationResults, based on the old data-table.tsx
+│   ├── templates/
+│   │   ├── form-submission.tsx          # form_submission (SOL-34) — what Sol Gate sends for every form; adapts to 0 / 1 / 2+ integrations
+│   │   └── mailchimp-confirmation.tsx   # first template; kept until SOL-33 lands and nothing sends it
+│   ├── template-props.ts            # EmailTemplateProps<TFields> — the props prepareEmail() passes every template
 │   └── registry.ts                  # emailTemplate -> { fieldsSchema, component } — add a template here, nothing else changes
 ├── lib/
 │   ├── sol-api.ts                   # typed HTTP client: getClient(), writeNotificationLog()

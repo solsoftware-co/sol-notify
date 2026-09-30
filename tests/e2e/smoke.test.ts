@@ -134,4 +134,58 @@ describe.skipIf(skip)("E2E smoke tests", () => {
       expect(email.html_body).not.toContain("[object Object]");
     });
   });
+
+  // What Sol Gate sends for every form (SOL-34): the 2+ integrations layout,
+  // with one failed row, is the one with the most moving parts.
+  describe("form_submission — delivered email", () => {
+    const runId = crypto.randomUUID().slice(0, 8);
+    const submission = { name: "E2E Test User", email: `e2e-${runId}@example.com` };
+    const mailchimpUrl = `https://example.com/e2e/${runId}/mailchimp`;
+    let email: MailtrapMessage;
+
+    beforeAll(async () => {
+      const triggeredAt = new Date(Date.now() - 5_000); // tolerate clock skew vs. Mailtrap
+      const res = await post(
+        emailEnvelope({
+          subject: `E2E form_submission ${runId}`,
+          emailTemplate: "form_submission",
+          fields: {
+            submission,
+            integrations: [
+              { name: "Mailchimp", outcome: "succeeded", url: mailchimpUrl },
+              { name: "Google Sheets", outcome: "failed", detail: "Spreadsheet permission denied" },
+            ],
+          },
+          cta: { url: `mailto:${submission.email}`, label: "Reply to E2E Test User" },
+        })
+      );
+      expect(res.status).toBe(202);
+      email = await waitForEmail(new RegExp(`E2E form_submission ${runId}`), triggeredAt);
+    });
+
+    it("renders the submitted fields", () => {
+      for (const [label, value] of Object.entries(submission)) {
+        expect(email.html_body).toContain(label);
+        expect(email.html_body).toContain(value);
+      }
+    });
+
+    it("renders the integrations table with the failure summary and reason", () => {
+      expect(email.html_body).toContain("Integrations");
+      expect(email.html_body).toContain("1 of 2 integrations failed");
+      expect(email.html_body).toContain("Spreadsheet permission denied");
+      expect(email.html_body).toContain(`href="${mailchimpUrl}"`);
+    });
+
+    it("renders Reply as the single CTA button", () => {
+      expect(email.html_body).toContain(`href="mailto:${submission.email}"`);
+      expect(email.html_body).toContain("Reply to E2E Test User");
+    });
+
+    it("contains no raw template syntax or serialisation artefacts", () => {
+      expect(email.html_body).not.toContain("{{");
+      expect(email.html_body).not.toContain("undefined");
+      expect(email.html_body).not.toContain("[object Object]");
+    });
+  });
 });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ReactElement } from "react";
 import MailchimpConfirmationEmail from "./templates/mailchimp-confirmation.js";
+import FormSubmissionEmail from "./templates/form-submission.js";
 
 // The array is the single source of truth for which templates exist — not
 // Object.keys(emailTemplates). This lets both EmailTemplateName and the
@@ -12,7 +13,7 @@ import MailchimpConfirmationEmail from "./templates/mailchimp-confirmation.js";
 // obviously narrower). Record<EmailTemplateName, ...> below then makes
 // emailTemplates and this list impossible to drift apart: TypeScript
 // rejects a missing or an extra key either way.
-export const emailTemplateNames = ["mailchimp_confirmation"] as const;
+export const emailTemplateNames = ["mailchimp_confirmation", "form_submission"] as const;
 
 export type EmailTemplateName = (typeof emailTemplateNames)[number];
 
@@ -31,6 +32,27 @@ interface EmailTemplateDefinition {
   component: (props: never) => ReactElement;
 }
 
+// form_submission (SOL-34) is what Sol Gate sends for every form: the
+// submitted fields (already filtered by the channel's include_fields) plus
+// the outcome of each integration that channel reports on. `url` and
+// `detail` come from sol-integrate's outcome (SOL-33) and are optional —
+// without them a row just has no link / no reason.
+const formSubmissionFieldsSchema = z.object({
+  submission: z.record(z.string(), z.string()),
+  integrations: z
+    .array(
+      z.object({
+        name: z.string(),
+        outcome: z.enum(["succeeded", "failed", "skipped"]),
+        url: z.string().url().optional(),
+        detail: z.string().optional(),
+      })
+    )
+    .optional(),
+});
+
+export type FormSubmissionFields = z.infer<typeof formSubmissionFieldsSchema>;
+
 // emailTemplate -> { fieldsSchema, component }. Adding a template later
 // (SOL-10's google_sheets_confirmation, SOL-11's analytics report) is: add
 // the name to emailTemplateNames above, then an entry here — `satisfies`
@@ -47,5 +69,9 @@ export const emailTemplates = {
   mailchimp_confirmation: {
     fieldsSchema: z.record(z.string(), z.string()),
     component: MailchimpConfirmationEmail,
+  },
+  form_submission: {
+    fieldsSchema: formSubmissionFieldsSchema,
+    component: FormSubmissionEmail,
   },
 } satisfies Record<EmailTemplateName, EmailTemplateDefinition>;
