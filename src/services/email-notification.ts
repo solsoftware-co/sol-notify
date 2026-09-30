@@ -1,5 +1,7 @@
 import { render } from "@react-email/render";
+import type { ReactElement } from "react";
 import { emailTemplates } from "../emails/registry.js";
+import type { EmailTemplateProps } from "../emails/template-props.js";
 import type { EmailEnvelope } from "../validators/notification.js";
 import { getClient, writeNotificationLog } from "../lib/sol-api.js";
 import { sendEmail, type EmailSenderEnv } from "../lib/email-sender.js";
@@ -66,13 +68,17 @@ export async function prepareEmail(
   // deliverEmail, so fetching it never delays this response.
   const banner = parseBannerConfig(client.settings);
 
-  const Component = template.component;
+  // `template` is a union over every registry entry, so TypeScript can't
+  // see that parsedFields.data came from this same entry's fieldsSchema —
+  // it would demand fields that satisfy every template's props at once.
+  // The pairing is guaranteed above (same `template`), so widen here.
+  const Component = template.component as (props: EmailTemplateProps<unknown>) => ReactElement;
   const html = await render(
     Component({
       previewText: envelope.subject,
       clientName: client.name,
       header: envelope.subject,
-      fields: parsedFields.data as Record<string, string>,
+      fields: parsedFields.data,
       ctaUrl: envelope.cta?.url,
       ctaLabel: envelope.cta?.label,
       bannerUrl: BANNER_CID_SRC,

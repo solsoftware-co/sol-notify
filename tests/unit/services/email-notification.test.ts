@@ -157,6 +157,32 @@ describe("prepareEmail", () => {
     expect(prepared.html).not.toContain("View in Mailchimp");
   });
 
+  it("renders form_submission with its own fields shape (submission + integrations)", async () => {
+    const prepared = await prepareEmail(SOL_API_ENV, {
+      ...baseEnvelope,
+      emailTemplate: "form_submission",
+      subject: "New contact form submission",
+      fields: {
+        submission: { email: "jane@example.com" },
+        integrations: [
+          { name: "Mailchimp", outcome: "succeeded", url: "https://us1.admin.mailchimp.com/m/1" },
+          { name: "Google Sheets", outcome: "failed", detail: "Spreadsheet permission denied" },
+        ],
+      },
+      cta: { url: "mailto:jane@example.com", label: "Reply to Jane" },
+    });
+    expect(prepared.emailTemplate).toBe("form_submission");
+    expect(prepared.html).toContain("jane@example.com");
+    expect(prepared.html).toContain("1 of 2 integrations failed");
+    expect(prepared.html).toContain("Reply to Jane");
+  });
+
+  it("rejects form_submission fields that are a flat record instead of { submission }", async () => {
+    await expect(
+      prepareEmail(SOL_API_ENV, { ...baseEnvelope, emailTemplate: "form_submission" })
+    ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
+  });
+
   it("does not render cta as a visible field row", async () => {
     const prepared = await prepareEmail(SOL_API_ENV, {
       ...baseEnvelope,

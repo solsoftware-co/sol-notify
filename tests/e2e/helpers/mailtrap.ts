@@ -37,6 +37,22 @@ function getInboxId(): number {
   return Number(requireEnv("MAILTRAP_INBOX_ID"));
 }
 
+// Mailtrap's free sandbox accepts one email per 10 seconds and rejects the
+// rest outright. The preview Worker's send retries give up well inside that
+// window, so a second send too soon after the first is simply lost.
+const SANDBOX_SEND_INTERVAL_MS = 11_000;
+let lastSandboxSendAt = 0;
+
+/**
+ * Call right before each request that makes the preview Worker send an
+ * email: waits until the sandbox will accept another one.
+ */
+export async function waitForSandboxSendSlot(): Promise<void> {
+  const wait = lastSandboxSendAt + SANDBOX_SEND_INTERVAL_MS - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastSandboxSendAt = Date.now();
+}
+
 /**
  * Returns the list of attachments for a given message ID.
  */
