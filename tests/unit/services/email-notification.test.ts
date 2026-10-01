@@ -87,6 +87,13 @@ describe("prepareEmail", () => {
     ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
   });
 
+  it("carries context and idempotencyKey from the envelope to the prepared email", async () => {
+    const context = { analyticsReportId: "report-1" };
+    const prepared = await prepareEmail(SOL_API_ENV, { ...baseEnvelope, context, idempotencyKey: "report-1:2026-10" });
+    expect(prepared.context).toEqual(context);
+    expect(prepared.idempotencyKey).toBe("report-1:2026-10");
+  });
+
   it("propagates SolApiNotFoundError when the client doesn't exist", async () => {
     getClientMock.mockRejectedValue(new SolApiNotFoundError("Client not found: acme-corp"));
     await expect(prepareEmail(SOL_API_ENV, baseEnvelope)).rejects.toBeInstanceOf(SolApiNotFoundError);
@@ -303,6 +310,36 @@ describe("deliverEmail", () => {
       FULL_ENV.SOL_API,
       FULL_ENV.SOL_API_KEY,
       expect.objectContaining({ outcome: "failed", errorMessage: expect.stringContaining("Resend is down") })
+    );
+  });
+
+  it("passes the idempotency key to the send and logs it with the request context", async () => {
+    sendEmailMock.mockResolvedValue({ mode: "resend", resendId: "resend-1" });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+    const context = { formId: "6f1c3b7e-2a4d-4e8f-9b0c-1d2e3f4a5b6c", submissionId: "sub-1" };
+
+    await deliverEmail(FULL_ENV, { ...prepared, context, idempotencyKey: "sub-1:channel-1" });
+
+    expect(sendEmailMock).toHaveBeenCalledWith(FULL_ENV, expect.objectContaining({ idempotencyKey: "sub-1:channel-1" }));
+    expect(writeNotificationLogMock).toHaveBeenCalledWith(
+      FULL_ENV.SOL_API,
+      FULL_ENV.SOL_API_KEY,
+      expect.objectContaining({
+        metadata: { recipients: ["sales@acme.com"], ...context, idempotencyKey: "sub-1:channel-1" },
+      })
+    );
+  });
+
+  it("logs only the recipients when there's no context or key", async () => {
+    sendEmailMock.mockResolvedValue({ mode: "mock" });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+
+    await deliverEmail(FULL_ENV, prepared);
+
+    expect(writeNotificationLogMock).toHaveBeenCalledWith(
+      FULL_ENV.SOL_API,
+      FULL_ENV.SOL_API_KEY,
+      expect.objectContaining({ metadata: { recipients: ["sales@acme.com"] } })
     );
   });
 

@@ -88,4 +88,50 @@ describe("notificationRequestSchema", () => {
     const result = notificationRequestSchema.safeParse({ ...valid, cta: "not-an-object" });
     expect(result.success).toBe(false);
   });
+
+  it("rejects a recipient that isn't an email address", () => {
+    const result = notificationRequestSchema.safeParse({ ...valid, recipients: ["sales@acme.com", "sales@acme"] });
+    expect(result.success).toBe(false);
+  });
+
+  describe("context", () => {
+    const formId = "6f1c3b7e-2a4d-4e8f-9b0c-1d2e3f4a5b6c";
+
+    it("accepts a form submission context", () => {
+      const result = notificationRequestSchema.safeParse({ ...valid, context: { formId, submissionId: "sub-1" } });
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts an analytics report context", () => {
+      const result = notificationRequestSchema.safeParse({ ...valid, context: { analyticsReportId: "report-1" } });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects a formId that isn't a UUID", () => {
+      const result = notificationRequestSchema.safeParse({ ...valid, context: { formId: "f1", submissionId: "sub-1" } });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects a context matching neither shape", () => {
+      const result = notificationRequestSchema.safeParse({ ...valid, context: { submissionId: "sub-1" } });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("idempotencyKey", () => {
+    it("accepts a key", () => {
+      const result = notificationRequestSchema.safeParse({ ...valid, idempotencyKey: "sub-1:channel-1" });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects an empty key", () => {
+      const result = notificationRequestSchema.safeParse({ ...valid, idempotencyKey: "" });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects a key over 200 characters, leaving room for the environment prefix within Resend's 256", () => {
+      const result = notificationRequestSchema.safeParse({ ...valid, idempotencyKey: "k".repeat(201) });
+      expect(result.success).toBe(false);
+    });
+  });
 });

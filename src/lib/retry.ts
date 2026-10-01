@@ -1,7 +1,6 @@
 // Only ever called from inside ctx.waitUntil() (the backgrounded half of a
-// request), never the synchronous request path — retry backoff would block
-// a caller (including client sites calling this service directly over HTTP
-// on form submit) for no reason otherwise.
+// request), never the synchronous request path — retry backoff would
+// otherwise hold up the calling Worker's own background work for no reason.
 
 export interface RetryOptions {
   attempts?: number;

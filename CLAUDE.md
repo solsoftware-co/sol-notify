@@ -18,6 +18,8 @@ npm run deploy     # deploy to Cloudflare Workers
 
 ## Environments
 
+**Staging and production are internal-only** (SOL-37): `workers_dev = false`, no routes, so they're reachable only through a service binding from Workers in this account (Sol Gate today; the analytics scheduler, SOL-12, and sol-logmon, SOL-14, later). This service sends whatever recipients, subject and template it's given from `notifications@solsoftware.co`, so a public URL would be an open relay the moment its key leaked. `X-API-Key` is still checked as a second layer. PR previews keep a public `workers.dev` URL (API-key protected) for the e2e suite; they only send into the Mailtrap sandbox. Staging is verified end-to-end through Sol Gate staging. Bruno (`bruno/`) therefore only has **Dev** and **PR Preview** environments, the same as sol-integrate.
+
 - **`development`** (local `npm run dev`) — email sends are mocked, see below.
 - **`preview`** (ephemeral, worker `sol-notify-pr-<PR#>`, SOL-17) — deployed by `.github/workflows/pr.yml` on every same-repo PR (fork PRs skipped — no secrets), deleted by `.github/workflows/cleanup.yml` on close. Deployed as `[env.preview]` in `wrangler.toml` (`ENVIRONMENT=preview`; the workflow rewrites that block's `name` to the per-PR Worker name in its own checkout, since wrangler 3 rejects `--name` with `--env`), which puts `email-sender.ts` in **mailtrap** mode: real delivery via Mailtrap's sandbox HTTP API (not nodemailer/SMTP — Workers have no raw TCP sockets) into an inbox no real mailbox receives, subject prefixed `[PREVIEW]`. Its `SOL_API` service binding targets sol-api's persistent `dev` Worker (SOL-31), not staging. `tests/e2e/smoke.test.ts` then POSTs a real notification and polls Mailtrap's Testing API (`tests/e2e/helpers/mailtrap.ts`, ported from the old service) to assert on the delivered HTML.
 - **`staging`** (`env.staging` in `wrangler.toml`, worker `sol-notify-staging`) — deployed automatically by `.github/workflows/release.yml` on every merge to `main`. Real Resend sends, subject prefixed `[STAGING]` (see `src/lib/email-sender.ts`).
@@ -58,9 +60,8 @@ src/
 │   ├── components/                  # shared primitives (EmailContainer, EmailHeader, EmailFooter, Banner, SectionDivider, FieldGroup, LabelText), ported from sales-lead-v1.tsx; IntegrationResults, based on the old data-table.tsx
 │   ├── templates/
 │   │   ├── form-submission.tsx          # form_submission (SOL-34) — what Sol Gate sends for every form; adapts to 0 / 1 / 2+ integrations
-│   │   └── mailchimp-confirmation.tsx   # first template; kept until SOL-33 lands and nothing sends it
-│   ├── template-props.ts            # EmailTemplateProps<TFields> — the props prepareEmail() passes every template
-│   └── registry.ts                  # emailTemplate -> { fieldsSchema, component } — add a template here, nothing else changes
+│   │   └── mailchimp-confirmation.tsx   # first template; nothing sends it since SOL-33 — kept until it's removed
+│   └── registry.ts                  # emailTemplate -> { fieldsSchema, component } — add a template here, nothing else changes; also EmailTemplateProps<TFields>, the props prepareEmail() passes every template
 ├── lib/
 │   ├── sol-api.ts                   # typed HTTP client: getClient(), writeNotificationLog()
 │   ├── retry.ts                     # withRetry() — only ever called from inside ctx.waitUntil(), never the sync request path
@@ -75,11 +76,18 @@ tests/
 
 ### Request flow — synchronous vs. backgrounded
 
-This service is called both by trusted backend services (e.g. integration-service, SOL-9) and directly over HTTP by client sites (e.g. on form submit), so the response must not be blocked through retry backoff.
+Callers are Workers in this account, over a service binding (Sol Gate, which notifies a form's channels after its integrations have run). They call this from their own background work, so the response must not wait on sol-notify's send retries.
 
 **Synchronous** (caller waits): validate envelope → validate `fields` against the `emailTemplate`'s own schema → `GET /v1/clients/:clientId` → render → respond `202`.
 
 **Backgrounded**, inside `c.executionCtx.waitUntil()` (after the response is sent): resolve the banner attachment → send (retried via `withRetry()`) → write the outcome to `POST /v1/notification-logs`. A failed log write is logged to console but never re-thrown — there's no caller left listening inside `waitUntil()`.
+
+### Idempotency and request context
+
+Both are optional envelope fields, sent by Sol Gate:
+
+- **`idempotencyKey`** (Sol Gate: `submissionId:channelId`) — passed to Resend as its `Idempotency-Key`, prefixed with the environment (`production:…`, `staging:…`) since the two share one Resend key. Resend sends once per key for 24 hours, so a caller retrying a request sol-notify already accepted doesn't email anyone twice. A concurrent duplicate (`409 concurrent_idempotent_requests`) is retried; the same key with different content (`409 invalid_idempotent_request`) isn't, and is logged as `failed`. The Mailtrap sandbox and the local mock don't deduplicate.
+- **`context`** — `{ formId, submissionId }` or `{ analyticsReportId }`, copied into the notification log's `metadata` (alongside `recipients` and the `idempotencyKey`), in the same shape sol-integrate logs it, so "why did this person get this email?" can be traced across services.
 
 ### Response envelope
 
@@ -106,5 +114,6 @@ Unit tests run inside the actual CF Workers runtime via `@cloudflare/vitest-pool
 - SOL-13 — adds the slack branch to `notification.requested`.
 - SOL-16 (staging, this doc) — done, deployed.
 - SOL-29 (production, this doc) — workflow/config built; deploy is pending the production GitHub secrets listed above being added.
-- SOL-18 (Bruno collection, `bruno/`) — done.
+- SOL-18 (Bruno collection, `bruno/`) — done. Staging/Production environments removed in SOL-37, since those Workers are internal-only.
+- SOL-37 (this doc) — internal-only staging/production, `idempotencyKey`, `context`, email-validated recipients.
 - SOL-17 (preview, this doc) — ephemeral per-PR env + Mailtrap-backed e2e email suite (ported from the old service's `tests/e2e/email/` pattern) rather than sol-api's shallow status-code smoke test style.

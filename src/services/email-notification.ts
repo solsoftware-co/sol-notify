@@ -1,8 +1,7 @@
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
-import { emailTemplates } from "../emails/registry.js";
-import type { EmailTemplateProps } from "../emails/template-props.js";
-import type { EmailEnvelope } from "../validators/notification.js";
+import { emailTemplates, type EmailTemplateProps } from "../emails/registry.js";
+import type { EmailEnvelope, RequestContext } from "../validators/notification.js";
 import { getClient, writeNotificationLog } from "../lib/sol-api.js";
 import { sendEmail, type EmailSenderEnv } from "../lib/email-sender.js";
 import { withRetry } from "../lib/retry.js";
@@ -36,6 +35,8 @@ export interface PreparedEmail {
   /** The client's own banner URL, fetched and attached at send time (see
    * lib/banner-attachment.ts). Unset means the default banner. */
   bannerImageUrl?: string;
+  context?: RequestContext;
+  idempotencyKey?: string;
 }
 
 // Synchronous half: validate fields against the template's own schema
@@ -94,6 +95,8 @@ export async function prepareEmail(
     subject: envelope.subject,
     html,
     bannerImageUrl: banner.imageUrl,
+    context: envelope.context,
+    idempotencyKey: envelope.idempotencyKey,
   };
 }
 
@@ -118,6 +121,7 @@ export async function deliverEmail(
         subject: prepared.subject,
         html: banner ? prepared.html : withHotlinkedBanner(prepared.html),
         attachments: banner ? [banner] : [],
+        idempotencyKey: prepared.idempotencyKey,
       })
     );
 
@@ -158,7 +162,11 @@ async function logOutcome(
         subject: prepared.subject,
         resendId: extra.resendId ?? null,
         errorMessage: extra.errorMessage ?? null,
-        metadata: { recipients: prepared.recipients },
+        metadata: {
+          recipients: prepared.recipients,
+          ...prepared.context,
+          ...(prepared.idempotencyKey && { idempotencyKey: prepared.idempotencyKey }),
+        },
       })
     );
   } catch (logErr) {

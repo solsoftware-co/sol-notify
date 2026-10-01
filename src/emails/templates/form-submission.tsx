@@ -8,8 +8,7 @@ import { FieldGroup } from "../components/field-group.js";
 import { CTAButton } from "../components/cta-button.js";
 import { IntegrationResults } from "../components/integration-results.js";
 import { colors } from "../styles.js";
-import type { EmailTemplateProps } from "../template-props.js";
-import type { FormSubmissionFields } from "../registry.js";
+import type { EmailTemplateProps, FormSubmissionFields } from "../registry.js";
 
 // The one template every Sol Gate form uses (SOL-34): the form notifies its
 // channels after its integrations have run, so one email reports both the

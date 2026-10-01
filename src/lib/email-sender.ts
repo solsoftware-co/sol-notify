@@ -18,6 +18,9 @@ export interface SendEmailRequest {
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
+  /** Live Resend sends only — the Mailtrap sandbox and the local mock don't
+   * deduplicate. */
+  idempotencyKey?: string;
 }
 
 // Discriminated on `mode` so each provider's id is only present — and
@@ -63,14 +66,25 @@ export async function sendEmail(env: EmailSenderEnv, request: SendEmailRequest):
     case "preview":
       return sendViaMailtrap(env, request);
     case "staging":
-      return sendViaResend(env, { ...request, subject: `[STAGING] ${request.subject}` });
+      return sendViaResend(env, environment, { ...request, subject: `[STAGING] ${request.subject}` });
     case "production":
-      return sendViaResend(env, request);
+      return sendViaResend(env, environment, request);
   }
 }
 
-async function sendViaResend(env: EmailSenderEnv, request: SendEmailRequest): Promise<SendEmailResult> {
+// Resend errors that a retry can fix despite their 4xx status: a second
+// request with the same idempotency key while the first is still in flight.
+const RETRYABLE_RESEND_ERRORS = new Set(["concurrent_idempotent_requests"]);
+
+async function sendViaResend(
+  env: EmailSenderEnv,
+  environment: "staging" | "production",
+  request: SendEmailRequest
+): Promise<SendEmailResult> {
   const resend = new Resend(env.RESEND_API_KEY);
+  // Staging and production share one Resend key (and so one idempotency key
+  // space), so the environment is part of the key.
+  const options = request.idempotencyKey ? { idempotencyKey: `${environment}:${request.idempotencyKey}` } : undefined;
   const { data, error } = await resend.emails.send({
     from: FROM_ADDRESS,
     to: request.to,
@@ -82,11 +96,12 @@ async function sendViaResend(env: EmailSenderEnv, request: SendEmailRequest): Pr
       contentType: a.contentType,
       contentId: a.contentId,
     })),
-  });
+  }, options);
 
   if (error) {
     const message = `Resend send failed: ${error.message}`;
-    throw isRetryableStatus(error.statusCode) ? new Error(message) : new NonRetryableError(message);
+    const retryable = isRetryableStatus(error.statusCode) || RETRYABLE_RESEND_ERRORS.has(error.name);
+    throw retryable ? new Error(message) : new NonRetryableError(message);
   }
 
   // Resend's response is itself a discriminated union — once `error` is

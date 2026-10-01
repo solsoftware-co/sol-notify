@@ -27,8 +27,13 @@ enabled = true
 # Ephemeral per-PR previews (SOL-17). .github/workflows/pr.yml rewrites this
 # name to sol-notify-pr-<N> in its own checkout before deploying — keep the
 # line exactly `name = "sol-notify-preview"` so that substitution matches.
+# Unlike staging/production, previews keep a public workers.dev URL
+# (API-key protected) so the e2e suite can reach them; they're safe to expose
+# because they only ever send into the Mailtrap sandbox and SOL_API points at
+# sol-api-dev.
 [env.preview]
 name = "sol-notify-preview"
+workers_dev = true
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
@@ -41,8 +46,15 @@ service = "sol-api-dev"
 [env.preview.observability]
 enabled = true
 
+# Staging and production are internal-only (SOL-37): no workers.dev URL,
+# reachable only through a service binding from Workers in this account (Sol
+# Gate, later the analytics scheduler and sol-logmon). A public service that
+# sends whatever it's given from notifications@solsoftware.co would be an
+# open relay the moment its key leaked. X-API-Key is still checked as a
+# second layer.
 [env.staging]
 name = "sol-notify-staging"
+workers_dev = false
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
@@ -57,6 +69,7 @@ enabled = true
 
 [env.production]
 name = "sol-notify"
+workers_dev = false
 
 [env.production.vars]
 ENVIRONMENT = "production"

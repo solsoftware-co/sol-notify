@@ -17,6 +17,23 @@ export const emailTemplateNames = ["mailchimp_confirmation", "form_submission"] 
 
 export type EmailTemplateName = (typeof emailTemplateNames)[number];
 
+// The props prepareEmail() passes to every template component. Everything
+// but `fields` is the same for every template (client name, subject, the
+// envelope's cta, the banner); `fields` is whatever that template's own
+// fieldsSchema parsed (see emailTemplates below).
+export interface EmailTemplateProps<TFields> {
+  previewText: string;
+  clientName: string;
+  header: string;
+  fields: TFields;
+  ctaUrl?: string;
+  ctaLabel?: string;
+  /** Always the inline attachment reference ("cid:banner_image"). */
+  bannerUrl: string;
+  bannerHeight?: number;
+  bannerWidth?: number;
+}
+
 interface EmailTemplateDefinition {
   fieldsSchema: z.ZodTypeAny;
   // Minimal shape used only to check emailTemplates below with `satisfies`

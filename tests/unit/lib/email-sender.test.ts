@@ -77,6 +77,72 @@ describe("sendEmail — mailtrap mode (ENVIRONMENT=preview)", () => {
   });
 });
 
+describe("sendEmail — resend mode (ENVIRONMENT=staging/production)", () => {
+  const resendOk = () => Response.json({ id: "resend-1" });
+
+  it("sends the idempotency key as an Idempotency-Key header, prefixed with the environment", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(resendOk());
+
+    const result = await sendEmail(
+      { ENVIRONMENT: "production", RESEND_API_KEY: "re_test" },
+      { ...REQUEST, idempotencyKey: "sub-1:channel-1" }
+    );
+
+    expect(result).toEqual({ mode: "resend", resendId: "resend-1" });
+    const headers = new Headers(fetchSpy.mock.calls[0]![1]!.headers);
+    expect(headers.get("Idempotency-Key")).toBe("production:sub-1:channel-1");
+  });
+
+  // Staging and production share one Resend key, so the same caller key
+  // must never dedupe across the two.
+  it("prefixes staging keys differently from production", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(resendOk());
+
+    await sendEmail({ ENVIRONMENT: "staging", RESEND_API_KEY: "re_test" }, { ...REQUEST, idempotencyKey: "sub-1:channel-1" });
+
+    expect(new Headers(fetchSpy.mock.calls[0]![1]!.headers).get("Idempotency-Key")).toBe("staging:sub-1:channel-1");
+  });
+
+  it("sends no Idempotency-Key header without a key", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(resendOk());
+
+    await sendEmail({ ENVIRONMENT: "production", RESEND_API_KEY: "re_test" }, REQUEST);
+
+    expect(new Headers(fetchSpy.mock.calls[0]![1]!.headers).has("Idempotency-Key")).toBe(false);
+  });
+
+  it("retries a concurrent request with the same key, though Resend answers 409", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json(
+        { statusCode: 409, name: "concurrent_idempotent_requests", message: "Same key already in progress" },
+        { status: 409 }
+      )
+    );
+
+    const err = await sendEmail(
+      { ENVIRONMENT: "production", RESEND_API_KEY: "re_test" },
+      { ...REQUEST, idempotencyKey: "sub-1:channel-1" }
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(NonRetryableError);
+  });
+
+  it("doesn't retry a key reused with different content", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json(
+        { statusCode: 409, name: "invalid_idempotent_request", message: "Same key, different payload" },
+        { status: 409 }
+      )
+    );
+
+    const err = await sendEmail(
+      { ENVIRONMENT: "production", RESEND_API_KEY: "re_test" },
+      { ...REQUEST, idempotencyKey: "sub-1:channel-1" }
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NonRetryableError);
+  });
+});
+
 describe("sendEmail — mock mode (ENVIRONMENT=development)", () => {
   it("swaps cid: references for data: URIs in the local preview, since a browser can't resolve cid:", async () => {
     await sendEmail(
