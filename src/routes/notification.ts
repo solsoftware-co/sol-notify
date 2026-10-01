@@ -5,6 +5,7 @@ import {
   deliverEmail,
   UnknownEmailTemplateError,
   InvalidTemplateFieldsError,
+  NoValidRecipientsError,
 } from "../services/email-notification.js";
 import { SolApiNotFoundError } from "../lib/sol-api.js";
 import { notFoundResponse, validationErrorResponse } from "../lib/responses.js";
@@ -43,6 +44,9 @@ notification.post("/", async (c) => {
     if (err instanceof UnknownEmailTemplateError) {
       return validationErrorResponse(c, err.message);
     }
+    if (err instanceof NoValidRecipientsError) {
+      return validationErrorResponse(c, err.message, { invalidRecipients: err.invalidRecipients });
+    }
     throw err;
   }
 
@@ -52,10 +56,10 @@ notification.post("/", async (c) => {
     emailTemplate: prepared.emailTemplate,
   });
 
-  // Send + log happen after the response is returned — this route is called
-  // both by trusted backend services and directly over HTTP by client sites
-  // (e.g. on form submit), so callers shouldn't be blocked through retry
-  // backoff. See src/lib/retry.ts.
+  // Send + log happen after the response is returned. Callers (Workers in
+  // this account, over a service binding) call this from their own
+  // background work and shouldn't wait on sol-notify's send retries. See
+  // src/lib/retry.ts.
   c.executionCtx.waitUntil(
     deliverEmail(
       {

@@ -19,7 +19,7 @@ vi.mock("../../../src/lib/email-sender.js", () => ({
   sendEmail: (...args: unknown[]) => sendEmailMock(...args),
 }));
 
-const { prepareEmail, deliverEmail, UnknownEmailTemplateError, InvalidTemplateFieldsError } = await import(
+const { prepareEmail, deliverEmail, UnknownEmailTemplateError, InvalidTemplateFieldsError, NoValidRecipientsError } = await import(
   "../../../src/services/email-notification.js"
 );
 const { SolApiNotFoundError } = await import("../../../src/lib/sol-api.js");
@@ -85,6 +85,31 @@ describe("prepareEmail", () => {
         { ...baseEnvelope, fields: { count: 5 } as unknown as Record<string, string> }
       )
     ).rejects.toBeInstanceOf(InvalidTemplateFieldsError);
+  });
+
+  it("drops recipients that aren't email addresses and keeps the rest", async () => {
+    const prepared = await prepareEmail(SOL_API_ENV, {
+      ...baseEnvelope,
+      recipients: ["sales@acme.com", "sales@acme", "", "ops@acme.com"],
+    });
+    expect(prepared.recipients).toEqual(["sales@acme.com", "ops@acme.com"]);
+    expect(prepared.droppedRecipients).toEqual(["sales@acme", ""]);
+  });
+
+  it("throws NoValidRecipientsError, before fetching the client, when no recipient is valid", async () => {
+    const err = await prepareEmail(SOL_API_ENV, { ...baseEnvelope, recipients: ["sales@acme", "nope"] }).catch(
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(NoValidRecipientsError);
+    expect((err as InstanceType<typeof NoValidRecipientsError>).invalidRecipients).toEqual(["sales@acme", "nope"]);
+    expect(getClientMock).not.toHaveBeenCalled();
+  });
+
+  it("carries context and idempotencyKey from the envelope to the prepared email", async () => {
+    const context = { analyticsReportId: "report-1" };
+    const prepared = await prepareEmail(SOL_API_ENV, { ...baseEnvelope, context, idempotencyKey: "report-1:2026-10" });
+    expect(prepared.context).toEqual(context);
+    expect(prepared.idempotencyKey).toBe("report-1:2026-10");
   });
 
   it("propagates SolApiNotFoundError when the client doesn't exist", async () => {
@@ -210,6 +235,7 @@ describe("deliverEmail", () => {
     clientId: "acme-corp",
     emailTemplate: "mailchimp_confirmation",
     recipients: ["sales@acme.com"],
+    droppedRecipients: [],
     subject: "New lead added to Mailchimp",
     html: "<html></html>",
   };
@@ -303,6 +329,53 @@ describe("deliverEmail", () => {
       FULL_ENV.SOL_API,
       FULL_ENV.SOL_API_KEY,
       expect.objectContaining({ outcome: "failed", errorMessage: expect.stringContaining("Resend is down") })
+    );
+  });
+
+  it("passes the idempotency key to the send and logs it with the request context", async () => {
+    sendEmailMock.mockResolvedValue({ mode: "resend", resendId: "resend-1" });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+    const context = { formId: "6f1c3b7e-2a4d-4e8f-9b0c-1d2e3f4a5b6c", submissionId: "sub-1" };
+
+    await deliverEmail(FULL_ENV, { ...prepared, context, idempotencyKey: "sub-1:channel-1" });
+
+    expect(sendEmailMock).toHaveBeenCalledWith(FULL_ENV, expect.objectContaining({ idempotencyKey: "sub-1:channel-1" }));
+    expect(writeNotificationLogMock).toHaveBeenCalledWith(
+      FULL_ENV.SOL_API,
+      FULL_ENV.SOL_API_KEY,
+      expect.objectContaining({
+        metadata: { recipients: ["sales@acme.com"], ...context, idempotencyKey: "sub-1:channel-1" },
+      })
+    );
+  });
+
+  it("sends only to the valid recipients and logs the dropped ones", async () => {
+    sendEmailMock.mockResolvedValue({ mode: "mock" });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+
+    await deliverEmail(FULL_ENV, { ...prepared, droppedRecipients: ["sales@acme"] });
+
+    expect(sendEmailMock).toHaveBeenCalledWith(FULL_ENV, expect.objectContaining({ to: ["sales@acme.com"] }));
+    expect(writeNotificationLogMock).toHaveBeenCalledWith(
+      FULL_ENV.SOL_API,
+      FULL_ENV.SOL_API_KEY,
+      expect.objectContaining({
+        recipientEmail: "sales@acme.com",
+        metadata: { recipients: ["sales@acme.com"], droppedRecipients: ["sales@acme"] },
+      })
+    );
+  });
+
+  it("logs only the recipients when there's no context or key", async () => {
+    sendEmailMock.mockResolvedValue({ mode: "mock" });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+
+    await deliverEmail(FULL_ENV, prepared);
+
+    expect(writeNotificationLogMock).toHaveBeenCalledWith(
+      FULL_ENV.SOL_API,
+      FULL_ENV.SOL_API_KEY,
+      expect.objectContaining({ metadata: { recipients: ["sales@acme.com"] } })
     );
   });
 
