@@ -1,7 +1,7 @@
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 import { emailTemplates, type EmailTemplateProps } from "../emails/registry.js";
-import type { EmailEnvelope, RequestContext } from "../validators/notification.js";
+import { isEmailAddress, type EmailEnvelope, type RequestContext } from "../validators/notification.js";
 import { getClient, writeNotificationLog } from "../lib/sol-api.js";
 import { sendEmail, type EmailSenderEnv } from "../lib/email-sender.js";
 import { withRetry } from "../lib/retry.js";
@@ -13,6 +13,13 @@ export class UnknownEmailTemplateError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "UnknownEmailTemplateError";
+  }
+}
+
+export class NoValidRecipientsError extends Error {
+  constructor(public readonly invalidRecipients: string[]) {
+    super("recipients contains no valid email address");
+    this.name = "NoValidRecipientsError";
   }
 }
 
@@ -29,7 +36,12 @@ export class InvalidTemplateFieldsError extends Error {
 export interface PreparedEmail {
   clientId: string;
   emailTemplate: string;
+  /** Only the valid email addresses from the envelope's recipients. */
   recipients: string[];
+  /** Recipients that weren't valid email addresses — not sent to, but
+   * recorded in the notification log so the address can be fixed at its
+   * source (e.g. the email group). */
+  droppedRecipients: string[];
   subject: string;
   html: string;
   /** The client's own banner URL, fetched and attached at send time (see
@@ -51,6 +63,22 @@ export async function prepareEmail(
   const template = emailTemplates[envelope.emailTemplate];
   if (!template) {
     throw new UnknownEmailTemplateError(`Unknown emailTemplate: ${envelope.emailTemplate}`);
+  }
+
+  // One bad address would make Resend reject the whole send, so a mistyped
+  // address in an email group would stop everyone in it getting the email.
+  // Send to the valid addresses instead; only reject when none are left.
+  const recipients = envelope.recipients.filter(isEmailAddress);
+  const droppedRecipients = envelope.recipients.filter((r) => !isEmailAddress(r));
+  if (recipients.length === 0) {
+    throw new NoValidRecipientsError(droppedRecipients);
+  }
+  if (droppedRecipients.length > 0) {
+    logger.warn("dropped invalid recipients", {
+      clientId: envelope.clientId,
+      emailTemplate: envelope.emailTemplate,
+      droppedCount: droppedRecipients.length,
+    });
   }
 
   const parsedFields = template.fieldsSchema.safeParse(envelope.fields);
@@ -91,7 +119,8 @@ export async function prepareEmail(
   return {
     clientId: envelope.clientId,
     emailTemplate: envelope.emailTemplate,
-    recipients: envelope.recipients,
+    recipients,
+    droppedRecipients,
     subject: envelope.subject,
     html,
     bannerImageUrl: banner.imageUrl,
@@ -164,6 +193,7 @@ async function logOutcome(
         errorMessage: extra.errorMessage ?? null,
         metadata: {
           recipients: prepared.recipients,
+          ...(prepared.droppedRecipients.length > 0 && { droppedRecipients: prepared.droppedRecipients }),
           ...prepared.context,
           ...(prepared.idempotencyKey && { idempotencyKey: prepared.idempotencyKey }),
         },

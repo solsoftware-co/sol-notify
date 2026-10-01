@@ -5,6 +5,7 @@ import {
   deliverEmail,
   UnknownEmailTemplateError,
   InvalidTemplateFieldsError,
+  NoValidRecipientsError,
 } from "../services/email-notification.js";
 import { SolApiNotFoundError } from "../lib/sol-api.js";
 import { notFoundResponse, validationErrorResponse } from "../lib/responses.js";
@@ -42,6 +43,9 @@ notification.post("/", async (c) => {
     }
     if (err instanceof UnknownEmailTemplateError) {
       return validationErrorResponse(c, err.message);
+    }
+    if (err instanceof NoValidRecipientsError) {
+      return validationErrorResponse(c, err.message, { invalidRecipients: err.invalidRecipients });
     }
     throw err;
   }

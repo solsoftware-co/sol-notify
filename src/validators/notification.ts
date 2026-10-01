@@ -25,9 +25,10 @@ export const requestContextSchema = z.union([
 export const emailEnvelopeSchema = z.object({
   clientId: z.string().min(1),
   type: z.literal("email"),
-  // A mistyped address in an email group fails here, at the request, rather
-  // than later as a failed send.
-  recipients: z.array(z.string().email()).min(1),
+  // Not checked as email addresses here: prepareEmail drops the invalid ones
+  // and sends to the rest (see isEmailAddress below), so one mistyped
+  // address in an email group doesn't stop the whole group's email.
+  recipients: z.array(z.string()).min(1),
   subject: z.string().min(1),
   emailTemplate: z.enum(emailTemplateNames),
   fields: z.record(z.string(), z.unknown()),
@@ -50,6 +51,12 @@ export const emailEnvelopeSchema = z.object({
 // slackEnvelopeSchema to this array to add slack support, with no other
 // changes to the email path.
 export const notificationRequestSchema = z.discriminatedUnion("type", [emailEnvelopeSchema]);
+
+const emailAddressSchema = z.string().email();
+
+export function isEmailAddress(value: string): boolean {
+  return emailAddressSchema.safeParse(value).success;
+}
 
 export type EmailEnvelope = z.infer<typeof emailEnvelopeSchema>;
 export type RequestContext = z.infer<typeof requestContextSchema>;

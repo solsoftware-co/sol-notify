@@ -78,9 +78,13 @@ tests/
 
 Callers are Workers in this account, over a service binding (Sol Gate, which notifies a form's channels after its integrations have run). They call this from their own background work, so the response must not wait on sol-notify's send retries.
 
-**Synchronous** (caller waits): validate envelope → validate `fields` against the `emailTemplate`'s own schema → `GET /v1/clients/:clientId` → render → respond `202`.
+**Synchronous** (caller waits): validate envelope → drop recipients that aren't valid email addresses (see below) → validate `fields` against the `emailTemplate`'s own schema → `GET /v1/clients/:clientId` → render → respond `202`.
 
 **Backgrounded**, inside `c.executionCtx.waitUntil()` (after the response is sent): resolve the banner attachment → send (retried via `withRetry()`) → write the outcome to `POST /v1/notification-logs`. A failed log write is logged to console but never re-thrown — there's no caller left listening inside `waitUntil()`.
+
+### Invalid recipients are dropped, not rejected
+
+Resend rejects a whole send if any one address is malformed, so one mistyped address in an email group would stop everyone in it getting the email. `prepareEmail` sends to the valid addresses only and records the rest as `droppedRecipients` in the notification log's `metadata` (plus a `warn` log line with the count), so they can be fixed at the source. Only when **no** recipient is valid does the request fail, with a `422` listing them in `details.invalidRecipients`. Validating addresses when email groups are saved belongs in sol-api, once it has write routes for them.
 
 ### Idempotency and request context
 
@@ -115,5 +119,5 @@ Unit tests run inside the actual CF Workers runtime via `@cloudflare/vitest-pool
 - SOL-16 (staging, this doc) — done, deployed.
 - SOL-29 (production, this doc) — workflow/config built; deploy is pending the production GitHub secrets listed above being added.
 - SOL-18 (Bruno collection, `bruno/`) — done. Staging/Production environments removed in SOL-37, since those Workers are internal-only.
-- SOL-37 (this doc) — internal-only staging/production, `idempotencyKey`, `context`, email-validated recipients.
+- SOL-37 (this doc) — internal-only staging/production, `idempotencyKey`, `context`, invalid recipients dropped.
 - SOL-17 (preview, this doc) — ephemeral per-PR env + Mailtrap-backed e2e email suite (ported from the old service's `tests/e2e/email/` pattern) rather than sol-api's shallow status-code smoke test style.

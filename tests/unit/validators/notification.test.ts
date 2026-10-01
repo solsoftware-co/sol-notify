@@ -89,9 +89,11 @@ describe("notificationRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects a recipient that isn't an email address", () => {
+  // prepareEmail drops invalid addresses and sends to the rest, so they
+  // aren't rejected at the envelope.
+  it("accepts a recipient that isn't an email address", () => {
     const result = notificationRequestSchema.safeParse({ ...valid, recipients: ["sales@acme.com", "sales@acme"] });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   describe("context", () => {
