@@ -1,3 +1,11 @@
+# [1.4.0](https://github.com/solsoftware-co/sol-notify/compare/v1.3.0...v1.4.0) (2026-10-01)
+
+
+### Features
+
+* make sol-notify internal-only and ready for Sol Gate (SOL-37) ([d21c775](https://github.com/solsoftware-co/sol-notify/commit/d21c77563eee8f04473d734638d89596e297b962))
+* send to valid recipients and drop invalid ones ([917bd88](https://github.com/solsoftware-co/sol-notify/commit/917bd88b53a7354a2910857f5d31dd41007a07b8))
+
 # [1.3.0](https://github.com/solsoftware-co/sol-notify/compare/v1.2.0...v1.3.0) (2026-09-30)
 
 
