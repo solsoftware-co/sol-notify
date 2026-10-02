@@ -23,8 +23,18 @@ function renderEmail(fields: FormSubmissionFields, cta: { ctaUrl?: string; ctaLa
 // tests tell a CTA button apart from the table's "View →" text links.
 const hrefCount = (html: string) => (html.match(/<a href=/g) ?? []).length;
 
-const mailchimp = { name: "Mailchimp", outcome: "succeeded" as const, url: "https://us1.admin.mailchimp.com/m/1" };
-const sheets = { name: "Google Sheets", outcome: "succeeded" as const, url: "https://docs.google.com/spreadsheets/d/1" };
+const mailchimp = {
+  name: "Newsletter",
+  typeLabel: "Mailchimp",
+  outcome: "succeeded" as const,
+  url: "https://us1.admin.mailchimp.com/m/1",
+};
+const sheets = {
+  name: "Leads sheet",
+  typeLabel: "Google Sheets",
+  outcome: "succeeded" as const,
+  url: "https://docs.google.com/spreadsheets/d/1",
+};
 
 describe("form_submission fieldsSchema", () => {
   const schema = emailTemplates.form_submission.fieldsSchema;
@@ -35,6 +45,10 @@ describe("form_submission fieldsSchema", () => {
 
   it("accepts integrations without url or detail", () => {
     expect(schema.safeParse({ submission, integrations: [{ name: "Mailchimp", outcome: "failed" }] }).success).toBe(true);
+  });
+
+  it("accepts an integration's typeLabel", () => {
+    expect(schema.safeParse({ submission, integrations: [mailchimp] }).success).toBe(true);
   });
 
   it("rejects an unknown outcome", () => {
@@ -78,13 +92,25 @@ describe("FormSubmissionEmail", () => {
   });
 
   describe("1 integration", () => {
-    it("renders a single View in {name} button instead of the Reply button", async () => {
+    it("renders a single View in {typeLabel} button instead of the Reply button", async () => {
       const html = await renderEmail({ submission, integrations: [mailchimp] });
       expect(html).toContain(`href="${mailchimp.url}"`);
       expect(html).toContain("View in Mailchimp");
+      expect(html).not.toContain("View in Newsletter");
       expect(html).not.toContain("Reply to Jane Doe");
       expect(html).not.toContain("Integrations");
       expect(hrefCount(html)).toBe(1);
+    });
+
+    it("names Google Sheets the same way", async () => {
+      const html = await renderEmail({ submission, integrations: [sheets] });
+      expect(html).toContain("View in Google Sheets");
+    });
+
+    it("falls back to the integration's name when no typeLabel is sent", async () => {
+      const { typeLabel: _typeLabel, ...untyped } = mailchimp;
+      const html = await renderEmail({ submission, integrations: [untyped] });
+      expect(html).toContain("View in Newsletter");
     });
 
     it("shows a failed integration's status and reason instead of a button", async () => {
@@ -121,8 +147,8 @@ describe("FormSubmissionEmail", () => {
     it("renders a results table with a View → link per row and Reply as the only button", async () => {
       const html = await renderEmail({ submission, integrations: [mailchimp, sheets] });
       expect(html).toContain("Integrations");
-      expect(html).toContain("Mailchimp");
-      expect(html).toContain("Google Sheets");
+      expect(html).toContain("Newsletter");
+      expect(html).toContain("Leads sheet");
       expect(html.match(/View →/g)).toHaveLength(2);
       expect(html).toContain(`href="${mailchimp.url}"`);
       expect(html).toContain(`href="${sheets.url}"`);

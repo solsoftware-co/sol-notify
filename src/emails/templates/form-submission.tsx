@@ -19,11 +19,14 @@ import type { EmailTemplateProps, FormSubmissionFields } from "../registry.js";
 // - 0 integrations: fields + the envelope's cta ("Reply to {name}", a
 //   mailto: Sol Gate builds when the form has an email field).
 // - 1 integration: mailchimp_confirmation's look — fields + one "View in
-//   {name}" button. The envelope's cta is not shown, so there's only ever
-//   one button. A failed or skipped integration (or one with no link) shows
-//   its status and reason as a single results row instead.
+//   {typeLabel}" button (the service, e.g. "Mailchimp" — not the
+//   integration's own name, which the client may not recognise). The
+//   envelope's cta is not shown, so there's only ever one button. A failed
+//   or skipped integration (or one with no link) shows its status and reason
+//   as a single results row instead, with no button.
 // - 2+ integrations: fields, then the IntegrationResults table (per-row
-//   "View →" links), then the envelope's cta as the single primary button.
+//   "View →" links, rows labelled by name so two of one type stay
+//   distinct), then the envelope's cta as the single primary button.
 export type FormSubmissionEmailProps = EmailTemplateProps<FormSubmissionFields>;
 
 export default function FormSubmissionEmail({
@@ -38,14 +41,27 @@ export default function FormSubmissionEmail({
   bannerWidth,
 }: FormSubmissionEmailProps) {
   const fieldList = Object.entries(fields.submission).map(([label, value]) => ({ label, value }));
-  const integrations = fields.integrations ?? [];
+  const hasFields = fieldList.length > 0;
 
-  const only = integrations.length === 1 ? integrations[0] : undefined;
-  const integrationButton =
-    only?.outcome === "succeeded" && only.url ? { href: only.url, label: `View in ${only.name}` } : undefined;
-  const showResults = integrations.length > 1 || (only !== undefined && !integrationButton);
-  const button =
-    integrations.length === 1 ? integrationButton : ctaUrl ? { href: ctaUrl, label: ctaLabel ?? "Reply" } : undefined;
+  const integrations = fields.integrations ?? [];
+  const hasMultipleIntegrations = integrations.length > 1;
+  const singleIntegration = integrations.length === 1 ? integrations[0] : undefined;
+
+  // A single integration's button needs a write that worked and a link to it.
+  const singleIntegrationButton =
+    singleIntegration?.outcome === "succeeded" && singleIntegration.url
+      ? { href: singleIntegration.url, label: `View in ${singleIntegration.typeLabel ?? singleIntegration.name}` }
+      : undefined;
+
+  // The envelope's cta ("Reply to {name}") — only when Sol Gate sent one.
+  const replyButton = ctaUrl ? { href: ctaUrl, label: ctaLabel ?? "Reply" } : undefined;
+
+  // A single integration without a button is shown as a results row instead.
+  const showResults = hasMultipleIntegrations || (singleIntegration !== undefined && !singleIntegrationButton);
+
+  // Only ever one button. With a single integration it's that integration's
+  // (or none, if it has no button) — never the reply button.
+  const ctaButton = singleIntegration ? singleIntegrationButton : replyButton;
 
   return (
     <Html>
@@ -56,11 +72,11 @@ export default function FormSubmissionEmail({
         <Banner src={bannerUrl} height={bannerHeight} width={bannerWidth} />
         <EmailContainer>
           <EmailHeader subheader={clientName} header={header} />
-          {fieldList.length > 0 && <SectionDivider />}
-          {fieldList.length > 0 && <FieldGroup fields={fieldList} />}
+          {hasFields && <SectionDivider />}
+          {hasFields && <FieldGroup fields={fieldList} />}
           {showResults && <SectionDivider />}
           {showResults && <IntegrationResults integrations={integrations} />}
-          {button && <CTAButton href={button.href} label={button.label} size="lg" />}
+          {ctaButton && <CTAButton href={ctaButton.href} label={ctaButton.label} size="lg" />}
           <EmailFooter />
         </EmailContainer>
       </Body>
