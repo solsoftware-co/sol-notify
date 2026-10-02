@@ -60,6 +60,10 @@ const formSubmissionFieldsSchema = z.object({
     .array(
       z.object({
         name: z.string(),
+        // The service it writes to ("Mailchimp"), for the 1-integration
+        // "View in …" button (SOL-44). Optional so a Sol Gate that doesn't
+        // send it yet still renders, with the name instead.
+        typeLabel: z.string().optional(),
         outcome: z.enum(["succeeded", "failed", "skipped"]),
         url: z.string().url().optional(),
         detail: z.string().optional(),
