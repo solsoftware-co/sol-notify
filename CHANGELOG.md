@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/solsoftware-co/sol-notify/compare/v1.4.0...v1.4.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* name the one-integration button after the service (SOL-44) ([71fe0df](https://github.com/solsoftware-co/sol-notify/commit/71fe0dff9c071a1f0dd52d7d6e1ebf6f7164243d))
+
 # [1.4.0](https://github.com/solsoftware-co/sol-notify/compare/v1.3.0...v1.4.0) (2026-10-01)
 
 
