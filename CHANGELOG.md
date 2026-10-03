@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/solsoftware-co/sol-notify/compare/v1.4.1...v1.5.0) (2026-10-03)
+
+
+### Features
+
+* log and forward trace and submission ids (SOL-46) ([d97fee2](https://github.com/solsoftware-co/sol-notify/commit/d97fee20bf9bed30f617d922f5c26ce6b1b368a0))
+
 ## [1.4.1](https://github.com/solsoftware-co/sol-notify/compare/v1.4.0...v1.4.1) (2026-10-02)
 
 
