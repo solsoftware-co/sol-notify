@@ -66,6 +66,7 @@ src/
 │   ├── sol-api.ts                   # typed HTTP client: getClient(), writeNotificationLog()
 │   ├── retry.ts                     # withRetry() — only ever called from inside ctx.waitUntil(), never the sync request path
 │   ├── email-sender.ts              # send modes: mock (development) / mailtrap (preview) / live Resend (staging, production)
+│   ├── log-context.ts               # environment, traceId, submissionId on every log line (SOL-46)
 │   └── logger.ts                    # structured JSON logger
 ├── middleware/{auth,error}.ts       # X-API-Key check, global error envelope
 └── types/index.ts                   # Env bindings, AppEnv
@@ -107,6 +108,10 @@ Every email's banner is downloaded at send time and attached inline, referenced 
 ### Email template registry
 
 Adding a template is a `src/emails/registry.ts` entry (one Zod `fieldsSchema` + one React component) plus the component file — no other code changes. `fields` is validated against that template's own schema, not left generic, so different integration types (e.g. SOL-10's Google Sheets confirmations) can have entirely different field shapes without constraining each other. `FieldGroup` renders whatever key-value pairs it's given generically, so most new templates need no new rendering code either.
+
+### Tracing (SOL-46)
+
+Every log line carries `environment`, a `traceId` and, for a submission, a `submissionId`. The `traceId` is the caller's `X-Trace-Id` (Sol Gate's, forwarded) or a new one; the `submissionId` is only ever the caller's `X-Submission-Id`, never made up. `src/lib/log-context.ts` holds them for the request in AsyncLocalStorage, so the backgrounded send in `waitUntil` keeps them, and `src/lib/sol-api.ts` forwards both to sol-api, never to Resend or Mailtrap. There is no `requestId`: Cloudflare's own `$metadata.requestId` tells invocations (e.g. a retried call's attempts) apart. `traceId` is one run of work (on every line); `submissionId` is the form submission it's for (only when there is one). A replayed submission would keep its `submissionId` under a new `traceId`. Filter Workers Logs by `submissionId = <id>` for everything that happened to a submission, `traceId = <id>` for one run, or `environment = production`.
 
 ### Testing
 

@@ -4,6 +4,8 @@
 // auth. Calls the new camelCase routes shipped by
 // sol-api's SOL-7 (client) and SOL-7 PR4 (notification-logs) work.
 
+import { traceHeaders } from "./log-context.js";
+
 const FETCH_TIMEOUT_MS = 10_000;
 
 type ApiEnvelope<T> =
@@ -37,6 +39,8 @@ async function solApiFetch<T>(
       headers: {
         "X-API-Key": apiKey,
         "Content-Type": "application/json",
+        // So sol-api logs under the same trace and submission (SOL-46).
+        ...traceHeaders(),
         ...init?.headers,
       },
       signal: controller.signal,
