@@ -51,7 +51,6 @@ notification.post("/", async (c) => {
   }
 
   logger.info("notification accepted", {
-    requestId: c.get("requestId"),
     clientId: prepared.clientId,
     emailTemplate: prepared.emailTemplate,
   });
