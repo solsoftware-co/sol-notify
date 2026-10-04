@@ -254,6 +254,35 @@ describe("deliverEmail", () => {
     );
   });
 
+  it("logs email sent, with a recipient count but no addresses, on a successful send", async () => {
+    sendEmailMock.mockResolvedValue({ mode: "resend", resendId: "resend-1" });
+    writeNotificationLogMock.mockResolvedValue(undefined);
+    const logSpy = vi.spyOn(console, "log");
+
+    await deliverEmail(FULL_ENV, prepared);
+
+    const sent = logSpy.mock.calls.map(([line]) => JSON.parse(line as string)).find((e) => e.message === "email sent");
+    expect(sent).toMatchObject({
+      level: "info",
+      clientId: "acme-corp",
+      emailTemplate: "mailchimp_confirmation",
+      mode: "resend",
+      recipients: 1,
+      resendId: "resend-1",
+    });
+    expect(JSON.stringify(sent)).not.toContain("sales@acme.com");
+  });
+
+  it("doesn't log email sent when the send fails", async () => {
+    sendEmailMock.mockRejectedValue(new Error("Resend 422: invalid from address"));
+    writeNotificationLogMock.mockResolvedValue(undefined);
+    const logSpy = vi.spyOn(console, "log");
+
+    await deliverEmail(FULL_ENV, prepared);
+
+    expect(logSpy.mock.calls.map(([line]) => JSON.parse(line as string).message)).not.toContain("email sent");
+  });
+
   it("attaches the downloaded banner inline", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } })
