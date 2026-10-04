@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/solsoftware-co/sol-notify/compare/v1.5.0...v1.6.0) (2026-10-04)
+
+
+### Features
+
+* log email sent after a successful delivery (SOL-46) ([1ca7851](https://github.com/solsoftware-co/sol-notify/commit/1ca7851645947bea295a90a6cef4d62e87f24ba4))
+
 # [1.5.0](https://github.com/solsoftware-co/sol-notify/compare/v1.4.1...v1.5.0) (2026-10-03)
 
 
