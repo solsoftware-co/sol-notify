@@ -154,6 +154,16 @@ export async function deliverEmail(
       })
     );
 
+    // The only sign in the logs that the email went out (SOL-46): it carries
+    // the submission's trace like every line. A count, never the addresses.
+    logger.info("email sent", {
+      clientId: prepared.clientId,
+      emailTemplate: prepared.emailTemplate,
+      mode: result.mode,
+      recipients: prepared.recipients.length,
+      ...(result.mode === "resend" && { resendId: result.resendId }),
+    });
+
     await logOutcome(env, prepared, "sent", {
       recipientEmail,
       resendId: result.mode === "resend" ? result.resendId : null,
